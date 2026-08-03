@@ -189,7 +189,7 @@ const HOLES = {
  17:{par:4,hcp:3, y:{blue:415,white:400,green:290,red:290}},
  18:{par:4,hcp:7, y:{blue:394,white:375,green:295,red:295}}
 };
-const COURSE_CENTER=[43.955,-79.762]; // approx – 15608 Hwy 50, Bolton
+const COURSE_CENTER=[43.9186,-79.7933]; // Caledon Woods GC – 15608 Regional Rd 50, Bolton
 /* ===== PASTE EXPORTED GREEN COORDINATES BETWEEN THE BRACES BELOW =====
    Do Setup once, tap EXPORT GREENS, then replace {} with the copied block. */
 const BAKED_GREENS = {};
@@ -213,7 +213,7 @@ async function saveGreens(){
 }
 
 /* ---------------- map ---------------- */
-const map=L.map("map",{zoomControl:false,attributionControl:true}).setView(COURSE_CENTER,15);
+const map=L.map("map",{zoomControl:false,attributionControl:true}).setView(COURSE_CENTER,16);
 L.control.zoom({position:"topright"}).addTo(map);
 L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
   {maxZoom:21,attribution:"Imagery © Google"}).addTo(map);
