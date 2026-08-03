@@ -215,8 +215,8 @@ async function saveGreens(){
 /* ---------------- map ---------------- */
 const map=L.map("map",{zoomControl:false,attributionControl:true}).setView(COURSE_CENTER,15);
 L.control.zoom({position:"topright"}).addTo(map);
-L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  {maxZoom:20,maxNativeZoom:19,attribution:"Esri World Imagery"}).addTo(map);
+L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+  {maxZoom:21,attribution:"Imagery © Google"}).addTo(map);
 
 const flagIcon=(n)=>L.divIcon({className:"pinicon",html:`<div class="flag">⛳</div><div style="text-align:center;font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000;margin-top:-6px">${n}</div>`,iconSize:[30,40],iconAnchor:[15,30]});
 const meIcon=L.divIcon({className:"melabel",html:'<div class="dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
