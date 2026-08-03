@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Caledon Woods GPS</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0e2a4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GPS Caddie">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --navy:#0e2a4a; --navy2:#123657; --green:#1e7a45; --gold:#c9a44c;
+    --paper:#f5f2ea; --ink:#122033; --red:#c0392b; --white:#fff; --blue:#2b6cb0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;font-family:"Helvetica Neue",Arial,sans-serif;background:var(--navy)}
+  #app{height:100%;display:flex;flex-direction:column}
+
+  /* ---------- top bar ---------- */
+  #topbar{background:var(--navy);color:var(--paper);padding:10px 14px 8px;display:flex;align-items:center;justify-content:space-between;z-index:1200}
+  #topbar .brand{line-height:1.05}
+  #topbar .brand b{font-size:15px;letter-spacing:.14em;font-weight:700}
+  #topbar .brand span{display:block;font-size:9.5px;letter-spacing:.28em;color:var(--gold)}
+  #modeToggle{background:transparent;border:1px solid rgba(201,164,76,.6);color:var(--gold);font-size:11px;letter-spacing:.1em;padding:7px 12px;border-radius:20px;cursor:pointer}
+  #modeToggle.setup{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+
+  /* ---------- hole strip ---------- */
+  #holestrip{background:var(--navy2);display:flex;overflow-x:auto;scrollbar-width:none;padding:6px 8px;gap:5px;z-index:1200}
+  #holestrip::-webkit-scrollbar{display:none}
+  .holechip{flex:0 0 auto;min-width:40px;padding:6px 4px;border-radius:8px;text-align:center;color:#9db3c9;background:transparent;border:1px solid transparent;cursor:pointer}
+  .holechip .n{font-size:15px;font-weight:700;display:block}
+  .holechip .p{font-size:9px;letter-spacing:.05em}
+  .holechip.active{background:var(--paper);color:var(--navy);border-color:var(--gold)}
+  .holechip.mapped .n::after{content:"•";color:var(--green);margin-left:2px}
+  .holechip.active.mapped .n::after{color:var(--green)}
+
+  /* ---------- map ---------- */
+  #map{flex:1;position:relative;z-index:1}
+  .leaflet-control-attribution{font-size:9px}
+
+  /* ---------- readout ---------- */
+  #readout{background:var(--paper);color:var(--ink);padding:10px 16px calc(12px + env(safe-area-inset-bottom));z-index:1200;border-top:3px solid var(--gold)}
+  #readout .row1{display:flex;align-items:baseline;justify-content:space-between}
+  #holeinfo{font-size:13px;font-weight:700;letter-spacing:.04em}
+  #holeinfo small{font-weight:400;color:#5a6b80}
+  #teeYdg{font-size:11px;color:#5a6b80;margin-top:2px}
+  #teeYdg b{color:var(--ink)}
+  .bigline{display:flex;align-items:baseline;justify-content:center;gap:10px;margin:2px 0 0}
+  #distance{font-size:64px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  #distance.stale{color:#8a97a8}
+  .yd{font-size:16px;font-weight:600;color:var(--green);letter-spacing:.1em}
+  #sub{display:flex;justify-content:center;gap:18px;font-size:11.5px;color:#5a6b80;margin-top:4px;font-variant-numeric:tabular-nums}
+  #sub b{color:var(--ink)}
+  #tapline{display:none;justify-content:center;font-size:12px;color:var(--blue);margin-top:3px;font-weight:600}
+  #status{font-size:11px;text-align:center;color:#7a6a2c;margin-top:5px;min-height:14px}
+  #actions{display:flex;gap:8px;margin-top:8px}
+  #actions button{flex:1;border:none;border-radius:10px;padding:11px 0;font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer}
+  #btnGPS{background:var(--navy);color:var(--paper)}
+  #btnGPS.on{background:var(--green)}
+  #btnNearest{background:#e6e0d2;color:var(--navy)}
+  #btnScore{background:var(--gold);color:var(--navy)}
+  #btnClearTap{background:#e6e0d2;color:var(--navy);display:none}
+
+  /* ---------- score sheet ---------- */
+  #scoreSheet{position:fixed;left:0;right:0;bottom:0;top:0;background:rgba(14,42,74,.55);display:none;z-index:2000}
+  #scoreSheet.open{display:flex;flex-direction:column;justify-content:flex-end}
+  #scorePanel{background:var(--paper);border-radius:18px 18px 0 0;max-height:82%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
+  #scoreHead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px}
+  #scoreHead b{font-size:15px;letter-spacing:.05em;color:var(--navy)}
+  #scoreHead .x{background:none;border:none;font-size:22px;color:var(--navy);cursor:pointer;padding:2px 8px}
+  #scoreTabs{display:flex;gap:8px;padding:0 16px 10px}
+  #scoreTabs button{flex:1;border:1px solid var(--navy);background:transparent;color:var(--navy);border-radius:8px;padding:8px 0;font-size:12px;font-weight:700;cursor:pointer}
+  #scoreTabs button.on{background:var(--navy);color:var(--paper)}
+  #scoreBody{overflow-y:auto;padding:0 16px 16px}
+
+  .prow{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #ded7c6;border-radius:12px;padding:10px 12px;margin-bottom:8px}
+  .prow .pname{font-weight:700;color:var(--navy);font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow .ptot{font-size:11px;color:#5a6b80;margin-right:10px;white-space:nowrap}
+  .stepper{display:flex;align-items:center;gap:2px}
+  .stepper button{width:38px;height:38px;border-radius:10px;border:none;background:var(--navy);color:var(--paper);font-size:20px;font-weight:700;cursor:pointer}
+  .stepper .val{width:44px;text-align:center;font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+  .stepper .val.na{color:#b3a98f;font-size:16px}
+  .scoreactions{display:flex;gap:8px;margin-top:6px}
+  .scoreactions button{flex:1;border:none;border-radius:10px;padding:10px 0;font-size:12px;font-weight:700;cursor:pointer;background:#e6e0d2;color:var(--navy)}
+  .scoreactions .danger{color:var(--red)}
+
+  table.card{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
+  table.card th,table.card td{border:1px solid #d8d0bd;padding:4px 2px;text-align:center}
+  table.card th{background:var(--navy);color:var(--paper);font-weight:700}
+  table.card td.hn{background:#eee8d9;font-weight:700}
+  table.card td.tot{background:#eee8d9;font-weight:800}
+  table.card .under{color:var(--red);font-weight:700}
+  table.card .over{color:var(--blue)}
+  .topar{font-size:12px;text-align:center;color:#5a6b80;margin-top:8px}
+  .topar b{color:var(--navy)}
+
+  /* setup banner */
+  #setupBanner{display:none;background:var(--gold);color:var(--navy);font-size:12.5px;font-weight:600;text-align:center;padding:7px 12px;z-index:1200}
+  body.setup #setupBanner{display:block}
+  body.setup #btnNearest{display:none}
+  #setupBanner button{margin-left:8px;background:var(--navy);color:var(--gold);border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+
+  /* tee selector */
+  #tees{display:flex;gap:6px}
+  .tee{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+  .tee[data-t=blue]{background:#2b6cb0}.tee[data-t=white]{background:#fff;border-color:#bbb}
+  .tee[data-t=green]{background:#1e7a45}.tee[data-t=red]{background:#c0392b}
+  .tee.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,164,76,.4)}
+
+  .pinicon{background:transparent}
+  .pinicon .flag{font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+  .melabel{background:transparent}
+  .melabel .dot{width:16px;height:16px;border-radius:50%;background:#2b6cb0;border:3px solid #fff;box-shadow:0 0 0 3px rgba(43,108,176,.35),0 1px 4px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="brand"><b>CALEDON WOODS</b><span>GPS CADDIE</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="tees">
+        <div class="tee sel" data-t="blue" title="Blue"></div>
+        <div class="tee" data-t="white" title="White"></div>
+        <div class="tee" data-t="green" title="Green"></div>
+        <div class="tee" data-t="red" title="Red"></div>
+      </div>
+      <button id="modeToggle">SETUP</button>
+    </div>
+  </div>
+
+  <div id="setupBanner">Tap the <b>centre of the green</b> for Hole <span id="setupHole">1</span>
+    <button id="setupNext">Save & next ▸</button>
+    <button id="btnExport">EXPORT GREENS</button>
+  </div>
+
+  <div id="holestrip"></div>
+  <div id="map"></div>
+
+  <div id="readout">
+    <div class="row1">
+      <div>
+        <div id="holeinfo">Hole 1 <small>· Par 4 · Hcp 6</small></div>
+        <div id="teeYdg"></div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:#5a6b80" id="gpsmeta">GPS off</div>
+    </div>
+    <div class="bigline"><span id="distance">—</span><span class="yd">YDS</span></div>
+    <div id="sub"><span>to centre of green</span></div>
+    <div id="tapline"></div>
+    <div id="status"></div>
+    <div id="actions">
+      <button id="btnGPS">START GPS</button>
+      <button id="btnScore">SCORE</button>
+      <button id="btnNearest">NEAREST HOLE</button>
+      <button id="btnClearTap">CLEAR TAP</button>
+    </div>
+  </div>
+</div>
+
+<div id="scoreSheet">
+  <div id="scorePanel">
+    <div id="scoreHead"><b id="scoreTitle">SCORE — HOLE 1</b><button class="x" id="scoreClose">✕</button></div>
+    <div id="scoreTabs">
+      <button id="tabHole" class="on">THIS HOLE</button>
+      <button id="tabCard">SCORECARD</button>
+    </div>
+    <div id="scoreBody"></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- scorecard data (Caledon Woods) ---------------- */
+const HOLES = {
+ 1:{par:4,hcp:6, y:{blue:414,white:383,green:335,red:335}},
+ 2:{par:4,hcp:16,y:{blue:320,white:303,green:303,red:208}},
+ 3:{par:3,hcp:8, y:{blue:184,white:172,green:140,red:140}},
+ 4:{par:4,hcp:10,y:{blue:315,white:292,green:292,red:233}},
+ 5:{par:3,hcp:14,y:{blue:191,white:175,green:175,red:110}},
+ 6:{par:4,hcp:2, y:{blue:407,white:379,green:379,red:307}},
+ 7:{par:4,hcp:18,y:{blue:294,white:282,green:282,red:243}},
+ 8:{par:5,hcp:12,y:{blue:515,white:496,green:421,red:421}},
+ 9:{par:4,hcp:4, y:{blue:440,white:417,green:303,red:303}},
+ 10:{par:5,hcp:13,y:{blue:531,white:514,green:388,red:388}},
+ 11:{par:3,hcp:15,y:{blue:176,white:166,green:166,red:125}},
+ 12:{par:5,hcp:5, y:{blue:540,white:528,green:415,red:415}},
+ 13:{par:3,hcp:17,y:{blue:166,white:152,green:152,red:110}},
+ 14:{par:4,hcp:11,y:{blue:359,white:339,green:339,red:242}},
+ 15:{par:"4/5",hcp:1,y:{blue:413,white:402,green:402,red:220}},
+ 16:{par:4,hcp:9, y:{blue:341,white:330,green:330,red:270}},
+ 17:{par:4,hcp:3, y:{blue:415,white:400,green:290,red:290}},
+ 18:{par:4,hcp:7, y:{blue:394,white:375,green:295,red:295}}
+};
+const COURSE_CENTER=[43.9186,-79.7933]; // Caledon Woods GC – 15608 Regional Rd 50, Bolton
+/* ===== PASTE EXPORTED GREEN COORDINATES BETWEEN THE BRACES BELOW =====
+   Do Setup once, tap EXPORT GREENS, then replace {} with the copied block. */
+const BAKED_GREENS = {"1":{"lat":43.92200584445358,"lng":-79.79811962402893},"2":{"lat":43.92239136317246,"lng":-79.802253395319},"3":{"lat":43.92064097334304,"lng":-79.80419334592172},"4":{"lat":43.918586867932,"lng":-79.80126842948722},"5":{"lat":43.91695928444444,"lng":-79.8000312039767},"6":{"lat":43.9136645289225,"lng":-79.79880809783936},"7":{"lat":43.91176357552742,"lng":-79.80140447616579},"8":{"lat":43.91518169270598,"lng":-79.80603933334352},"9":{"lat":43.91403203699115,"lng":-79.8011550307274},"10":{"lat":43.91712929405476,"lng":-79.80382651090623},"11":{"lat":43.917048338479816,"lng":-79.801624417305},"12":{"lat":43.913548981744945,"lng":-79.79628682136537},"13":{"lat":43.91243564524109,"lng":-79.79475005938754},"14":{"lat":43.911889367261914,"lng":-79.79093849658967},"15":{"lat":43.9153362597304,"lng":-79.78864345603144},"16":{"lat":43.91814383771622,"lng":-79.79288175702095},"17":{"lat":43.91772375720363,"lng":-79.79869214834936},"18":{"lat":43.91913981643108,"lng":-79.79483574628831}};
+/* ===================================================================== */
+const M2Y=1.09361;
+
+let mode="play", curHole=1, tee="blue";
+let greens={};           // {hole:{lat,lng}}
+let myPos=null, watchId=null, lastFix=0;
+let tapTarget=null;
+
+/* ---------------- storage ---------------- */
+async function loadGreens(){
+  let local={};
+  try{const v=localStorage.getItem("cw:greens"); if(v) local=JSON.parse(v);}catch(e){}
+  greens={...BAKED_GREENS,...local}; // baked-in flags for everyone; your own taps override
+  try{const t=localStorage.getItem("cw:tee"); if(t){tee=t; document.querySelectorAll(".tee").forEach(x=>x.classList.toggle("sel",x.dataset.t===tee));}}catch(e){}
+}
+async function saveGreens(){
+  try{localStorage.setItem("cw:greens",JSON.stringify(greens));}catch(e){setStatus("Couldn't save — storage unavailable");}
+}
+
+/* ---------------- map ---------------- */
+const map=L.map("map",{zoomControl:false,attributionControl:true}).setView(COURSE_CENTER,16);
+L.control.zoom({position:"topright"}).addTo(map);
+L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+  {maxZoom:21,attribution:"Imagery © Google"}).addTo(map);
+
+const flagIcon=(n)=>L.divIcon({className:"pinicon",html:`<div class="flag">⛳</div><div style="text-align:center;font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000;margin-top:-6px">${n}</div>`,iconSize:[30,40],iconAnchor:[15,30]});
+const meIcon=L.divIcon({className:"melabel",html:'<div class="dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
+
+let greenMarkers={}, meMarker=null, lineToGreen=null, tapMarker=null, lineToTap=null;
+
+function renderGreens(){
+  Object.values(greenMarkers).forEach(m=>map.removeLayer(m)); greenMarkers={};
+  for(const h in greens){
+    greenMarkers[h]=L.marker([greens[h].lat,greens[h].lng],{icon:flagIcon(h)}).addTo(map)
+      .on("click",()=>selectHole(+h));
+  }
+  renderStrip();
+}
+
+/* ---------------- hole strip ---------------- */
+function renderStrip(){
+  const s=document.getElementById("holestrip"); s.innerHTML="";
+  for(let h=1;h<=18;h++){
+    const d=document.createElement("div");
+    d.className="holechip"+(h===curHole?" active":"")+(greens[h]?" mapped":"");
+    d.innerHTML=`<span class="n">${h}</span><span class="p">P${HOLES[h].par}</span>`;
+    d.onclick=()=>selectHole(h);
+    s.appendChild(d);
+  }
+  document.querySelector(".holechip.active")?.scrollIntoView({inline:"center",behavior:"smooth"});
+}
+
+function selectHole(h){
+  curHole=h; tapTarget=null; clearTapUI();
+  document.getElementById("setupHole").textContent=h;
+  const d=HOLES[h];
+  document.getElementById("holeinfo").innerHTML=`Hole ${h} <small>· Par ${d.par} · Hcp ${d.hcp}</small>`;
+  document.getElementById("teeYdg").innerHTML=
+    `<b style="color:#2b6cb0">${d.y.blue}</b> / ${d.y.white} / <span style="color:#1e7a45">${d.y.green}</span> / <span style="color:#c0392b">${d.y.red}</span> yds`;
+  if(greens[h]){
+    const g=[greens[h].lat,greens[h].lng];
+    if(myPos && mode==="play") map.fitBounds(L.latLngBounds([myPos,g]).pad(0.25));
+    else map.setView(g,17);
+  }
+  renderStrip(); updateReadout();
+}
+
+/* ---------------- GPS ---------------- */
+function startGPS(){
+  if(!navigator.geolocation){setStatus("Geolocation not supported in this browser.");return;}
+  if(watchId!==null){stopGPS();return;}
+  setStatus("Requesting location…");
+  watchId=navigator.geolocation.watchPosition(p=>{
+    myPos=[p.coords.latitude,p.coords.longitude]; lastFix=Date.now();
+    const acc=Math.round(p.coords.accuracy*M2Y);
+    document.getElementById("gpsmeta").innerHTML=`GPS ±${acc}y`;
+    if(!meMarker){meMarker=L.marker(myPos,{icon:meIcon}).addTo(map); map.setView(myPos,17);}
+    else meMarker.setLatLng(myPos);
+    updateReadout();
+  },err=>{
+    stopGPS();
+    setStatus(err.code===1
+      ?"Location blocked. If this is running inside Claude, open the file in your phone's browser or deploy it (Firebase) — GPS needs a normal browser tab."
+      :"GPS error: "+err.message);
+  },{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+  document.getElementById("btnGPS").textContent="GPS ON";
+  document.getElementById("btnGPS").classList.add("on");
+}
+function stopGPS(){
+  if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+  document.getElementById("btnGPS").textContent="START GPS";
+  document.getElementById("btnGPS").classList.remove("on");
+  document.getElementById("gpsmeta").textContent="GPS off";
+}
+
+/* ---------------- distance ---------------- */
+function distYds(a,b){
+  const R=6371000,toR=x=>x*Math.PI/180;
+  const dLat=toR(b[0]-a[0]),dLng=toR(b[1]-a[1]);
+  const s=Math.sin(dLat/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s))*M2Y;
+}
+
+function updateReadout(){
+  const dEl=document.getElementById("distance"), sub=document.getElementById("sub");
+  const g=greens[curHole];
+  if(!g){dEl.textContent="—";sub.innerHTML="<span>green not mapped yet — use Setup</span>";drawLines();return;}
+  if(!myPos){dEl.textContent="—";sub.innerHTML="<span>to centre of green · start GPS</span>";drawLines();return;}
+  const gp=[g.lat,g.lng];
+  const d=Math.round(distYds(myPos,gp));
+  dEl.textContent=d;
+  dEl.classList.toggle("stale",Date.now()-lastFix>10000);
+  let extra="";
+  if(tapTarget){
+    const a=Math.round(distYds(myPos,tapTarget));
+    const b=Math.round(distYds(tapTarget,gp));
+    document.getElementById("tapline").style.display="flex";
+    document.getElementById("tapline").textContent=`Tap point: ${a} yds to it · ${b} yds from it to green`;
+  }
+  sub.innerHTML=`<span>to centre of green</span>`;
+  drawLines();
+}
+
+function drawLines(){
+  if(lineToGreen){map.removeLayer(lineToGreen);lineToGreen=null;}
+  if(lineToTap){map.removeLayer(lineToTap);lineToTap=null;}
+  const g=greens[curHole];
+  if(myPos&&g) lineToGreen=L.polyline([myPos,[g.lat,g.lng]],{color:"#c9a44c",weight:3,dashArray:"6 6",opacity:.9}).addTo(map);
+  if(myPos&&tapTarget) lineToTap=L.polyline([myPos,tapTarget],{color:"#2b6cb0",weight:3,opacity:.9}).addTo(map);
+}
+
+function clearTapUI(){
+  if(tapMarker){map.removeLayer(tapMarker);tapMarker=null;}
+  document.getElementById("tapline").style.display="none";
+  document.getElementById("btnClearTap").style.display="none";
+  drawLines();
+}
+
+/* ---------------- map taps ---------------- */
+map.on("click",async e=>{
+  if(mode==="setup"){
+    greens[curHole]={lat:e.latlng.lat,lng:e.latlng.lng};
+    await saveGreens(); renderGreens(); updateReadout();
+    setStatus(`Hole ${curHole} green saved ✔`);
+  }else{
+    tapTarget=[e.latlng.lat,e.latlng.lng];
+    if(tapMarker) tapMarker.setLatLng(tapTarget);
+    else tapMarker=L.circleMarker(tapTarget,{radius:7,color:"#2b6cb0",fillColor:"#2b6cb0",fillOpacity:.85}).addTo(map);
+    document.getElementById("btnClearTap").style.display="block";
+    if(!myPos && greens[curHole]){
+      const b=Math.round(distYds(tapTarget,[greens[curHole].lat,greens[curHole].lng]));
+      document.getElementById("tapline").style.display="flex";
+      document.getElementById("tapline").textContent=`Tap point: ${b} yds to green centre`;
+      drawLines();
+    } else updateReadout();
+  }
+});
+
+/* ---------------- controls ---------------- */
+document.getElementById("modeToggle").onclick=()=>{
+  mode=mode==="play"?"setup":"play";
+  document.body.classList.toggle("setup",mode==="setup");
+  document.getElementById("modeToggle").classList.toggle("setup",mode==="setup");
+  document.getElementById("modeToggle").textContent=mode==="setup"?"DONE":"SETUP";
+  setStatus(mode==="setup"?"Setup: zoom into each green and tap its centre.":"");
+};
+document.getElementById("setupNext").onclick=()=>{ if(curHole<18) selectHole(curHole+1); };
+document.getElementById("btnExport").onclick=async()=>{
+  const n=Object.keys(greens).length;
+  if(n===0){setStatus("Nothing to export — map some greens first.");return;}
+  const txt=JSON.stringify(greens);
+  try{
+    await navigator.clipboard.writeText(txt);
+    setStatus(`Copied ${n} green${n>1?"s":""} to clipboard ✔ — paste into BAKED_GREENS or send to Claude.`);
+  }catch(e){
+    prompt("Copy this and paste it into BAKED_GREENS (or send to Claude):",txt);
+  }
+};
+document.getElementById("btnGPS").onclick=startGPS;
+document.getElementById("btnNearest").onclick=()=>{
+  if(!myPos){setStatus("Start GPS first.");return;}
+  let best=null,bd=1e12;
+  for(const h in greens){const d=distYds(myPos,[greens[h].lat,greens[h].lng]);if(d<bd){bd=d;best=+h;}}
+  if(best){selectHole(best);setStatus(`Nearest green: hole ${best}`);}
+  else setStatus("No greens mapped yet.");
+};
+document.getElementById("btnClearTap").onclick=()=>{tapTarget=null;clearTapUI();};
+document.querySelectorAll(".tee").forEach(t=>t.onclick=async()=>{
+  tee=t.dataset.t;
+  document.querySelectorAll(".tee").forEach(x=>x.classList.toggle("sel",x===t));
+  try{localStorage.setItem("cw:tee",tee);}catch(e){}
+});
+function setStatus(s){document.getElementById("status").textContent=s;}
+
+/* ---------------- scoring ---------------- */
+let players=[{name:"Me",scores:{}}], scoreTab="hole";
+const numPar=h=>parseInt(HOLES[h].par); // hole 15 "4/5" counts as 4
+
+function loadScores(){
+  try{const v=localStorage.getItem("cw:players"); if(v){const p=JSON.parse(v); if(Array.isArray(p)&&p.length)players=p;}}catch(e){}
+}
+function saveScores(){
+  try{localStorage.setItem("cw:players",JSON.stringify(players));}catch(e){}
+}
+function pStats(p){
+  let out=0,inn=0,parAcc=0,played=0;
+  for(let h=1;h<=18;h++){const s=p.scores[h];if(s){(h<=9?out+= s:inn+=s);parAcc+=numPar(h);played++;}}
+  return{out,inn,tot:out+inn,toPar:(out+inn)-parAcc,played};
+}
+const fmtToPar=n=>n===0?"E":(n>0?"+"+n:""+n);
+
+function openScore(){document.getElementById("scoreSheet").classList.add("open");renderScore();}
+function closeScore(){document.getElementById("scoreSheet").classList.remove("open");}
+
+function renderScore(){
+  document.getElementById("scoreTitle").textContent=scoreTab==="hole"?`SCORE — HOLE ${curHole} (PAR ${HOLES[curHole].par})`:"SCORECARD";
+  document.getElementById("tabHole").classList.toggle("on",scoreTab==="hole");
+  document.getElementById("tabCard").classList.toggle("on",scoreTab==="card");
+  const b=document.getElementById("scoreBody"); b.innerHTML="";
+  if(scoreTab==="hole"){
+    players.forEach((p,i)=>{
+      const s=p.scores[curHole];
+      const st=pStats(p);
+      const row=document.createElement("div"); row.className="prow";
+      row.innerHTML=`<span class="pname"></span><span class="ptot">${st.played? st.tot+" ("+fmtToPar(st.toPar)+")":""}</span>
+        <span class="stepper">
+          <button data-i="${i}" data-d="-1">−</button>
+          <span class="val ${s?"":"na"}">${s||"–"}</span>
+          <button data-i="${i}" data-d="1">+</button>
+        </span>`;
+      row.querySelector(".pname").textContent=p.name;
+      row.querySelector(".pname").onclick=()=>renamePlayer(i);
+      b.appendChild(row);
+    });
+    b.insertAdjacentHTML("beforeend",`<div class="scoreactions">
+      <button id="addPlayer">+ ADD PLAYER</button>
+      <button id="clearHole">CLEAR HOLE</button>
+      <button id="newRound" class="danger">NEW ROUND</button></div>
+      <div class="topar">Tap + to start at par · tap a name to rename</div>`);
+    b.querySelectorAll(".stepper button").forEach(btn=>btn.onclick=()=>{
+      const p=players[+btn.dataset.i], d=+btn.dataset.d;
+      let s=p.scores[curHole];
+      if(!s) s=(d>0?numPar(curHole):null); // first + = par; first − does nothing
+      else {s+=d; if(s<1)s=null;}
+      if(s===null) delete p.scores[curHole]; else p.scores[curHole]=Math.min(s,15);
+      saveScores(); renderScore();
+    });
+    document.getElementById("addPlayer").onclick=()=>{
+      if(players.length>=4){setStatus("Max 4 players.");return;}
+      const n=prompt("Player name:"); if(!n)return;
+      players.push({name:n.trim().slice(0,14),scores:{}}); saveScores(); renderScore();
+    };
+    document.getElementById("clearHole").onclick=()=>{
+      players.forEach(p=>delete p.scores[curHole]); saveScores(); renderScore();
+    };
+    document.getElementById("newRound").onclick=()=>{
+      if(confirm("Wipe all scores and start a new round?")){players.forEach(p=>p.scores={});saveScores();renderScore();}
+    };
+  }else{
+    let html='<table class="card"><tr><th>Hole</th>';
+    for(let h=1;h<=9;h++)html+=`<th>${h}</th>`; html+="<th>Out</th></tr><tr><td class='hn'>Par</td>";
+    for(let h=1;h<=9;h++)html+=`<td class='hn'>${HOLES[h].par}</td>`; html+="<td class='hn'>35</td></tr>";
+    players.forEach(p=>{const st=pStats(p);html+=`<tr><td class='hn'>${esc(p.name)}</td>`;
+      for(let h=1;h<=9;h++)html+=cell(p,h); html+=`<td class='tot'>${st.out||""}</td></tr>`;});
+    html+='</table><div style="height:10px"></div><table class="card"><tr><th>Hole</th>';
+    for(let h=10;h<=18;h++)html+=`<th>${h}</th>`; html+="<th>In</th><th>Tot</th></tr><tr><td class='hn'>Par</td>";
+    for(let h=10;h<=18;h++)html+=`<td class='hn'>${HOLES[h].par}</td>`; html+="<td class='hn'>36</td><td class='hn'>71</td></tr>";
+    players.forEach(p=>{const st=pStats(p);html+=`<tr><td class='hn'>${esc(p.name)}</td>`;
+      for(let h=10;h<=18;h++)html+=cell(p,h);
+      html+=`<td class='tot'>${st.inn||""}</td><td class='tot'>${st.tot||""}</td></tr>`;});
+    html+="</table>";
+    players.forEach(p=>{const st=pStats(p);
+      if(st.played)html+=`<div class="topar"><b>${esc(p.name)}</b>: ${st.tot} thru ${st.played} · ${fmtToPar(st.toPar)}</div>`;});
+    b.innerHTML=html;
+  }
+  function cell(p,h){const s=p.scores[h];if(!s)return"<td></td>";
+    const d=s-numPar(h);const c=d<0?"under":(d>0?"over":"");return`<td class="${c}">${s}</td>`;}
+  function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML;}
+}
+function renamePlayer(i){
+  const n=prompt("Rename player:",players[i].name);
+  if(n)players[i].name=n.trim().slice(0,14); saveScores(); renderScore();
+}
+document.getElementById("btnScore").onclick=openScore;
+document.getElementById("scoreClose").onclick=closeScore;
+document.getElementById("scoreSheet").onclick=e=>{if(e.target.id==="scoreSheet")closeScore();};
+document.getElementById("tabHole").onclick=()=>{scoreTab="hole";renderScore();};
+document.getElementById("tabCard").onclick=()=>{scoreTab="card";renderScore();};
+
+/* ---------------- init ---------------- */
+(async()=>{
+  await loadGreens();
+  loadScores();
+  renderGreens();
+  selectHole(1);
+  if(Object.keys(greens).length===0)
+    setStatus("First time: tap SETUP, zoom to each green on the satellite map, tap its centre.");
+})();
+</script>
+</body>
+</html>
