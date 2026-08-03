@@ -134,9 +134,10 @@
     </div>
   </div>
 
-  <div id="setupBanner">Tap the <b>centre of the green</b> for Hole <span id="setupHole">1</span>
+  <div id="setupBanner">Tap the <b id="setupWhat">centre of the green</b> for Hole <span id="setupHole">1</span>
+    <button id="setupTarget">TARGET: GREEN</button>
     <button id="setupNext">Save & next ▸</button>
-    <button id="btnExport">EXPORT GREENS</button>
+    <button id="btnExport">EXPORT</button>
   </div>
 
   <div id="holestrip"></div>
@@ -201,22 +202,30 @@ const COURSE_CENTER=[43.9186,-79.7933]; // Caledon Woods GC – 15608 Regional R
    Do Setup once, tap EXPORT GREENS, then replace {} with the copied block. */
 const BAKED_GREENS = {"1":{"lat":43.92200584445358,"lng":-79.79811962402893},"2":{"lat":43.92239136317246,"lng":-79.802253395319},"3":{"lat":43.92064097334304,"lng":-79.80419334592172},"4":{"lat":43.918586867932,"lng":-79.80126842948722},"5":{"lat":43.91695928444444,"lng":-79.8000312039767},"6":{"lat":43.9136645289225,"lng":-79.79880809783936},"7":{"lat":43.91176357552742,"lng":-79.80140447616579},"8":{"lat":43.91518169270598,"lng":-79.80603933334352},"9":{"lat":43.91403203699115,"lng":-79.8011550307274},"10":{"lat":43.91712929405476,"lng":-79.80382651090623},"11":{"lat":43.917048338479816,"lng":-79.801624417305},"12":{"lat":43.913548981744945,"lng":-79.79628682136537},"13":{"lat":43.91243564524109,"lng":-79.79475005938754},"14":{"lat":43.911889367261914,"lng":-79.79093849658967},"15":{"lat":43.9153362597304,"lng":-79.78864345603144},"16":{"lat":43.91814383771622,"lng":-79.79288175702095},"17":{"lat":43.91772375720363,"lng":-79.79869214834936},"18":{"lat":43.91913981643108,"lng":-79.79483574628831}};
 /* ===================================================================== */
+/* Tee-box locations (centre of each tee complex) — same export workflow */
+const BAKED_TEES = {};
+const TEE_RADIUS_Y = 40;   // within this many yards of the tee marker = "tee mode"
 const M2Y=1.09361;
 
-let mode="play", curHole=1, tee="blue";
-let greens={};           // {hole:{lat,lng}}
+let mode="play", curHole=1, tee="blue", setupTarget="green";
+let greens={}, teePts={};    // {hole:{lat,lng}}
 let myPos=null, watchId=null, lastFix=0;
 let tapTarget=null;
 
 /* ---------------- storage ---------------- */
 async function loadGreens(){
-  let local={};
-  try{const v=localStorage.getItem("cw:greens"); if(v) local=JSON.parse(v);}catch(e){}
-  greens={...BAKED_GREENS,...local}; // baked-in flags for everyone; your own taps override
+  let localG={}, localT={};
+  try{const v=localStorage.getItem("cw:greens"); if(v) localG=JSON.parse(v);}catch(e){}
+  try{const v=localStorage.getItem("cw:tees"); if(v) localT=JSON.parse(v);}catch(e){}
+  greens={...BAKED_GREENS,...localG};
+  teePts={...BAKED_TEES,...localT};
   try{const t=localStorage.getItem("cw:tee"); if(t){tee=t; document.querySelectorAll(".tee").forEach(x=>x.classList.toggle("sel",x.dataset.t===tee));}}catch(e){}
 }
 async function saveGreens(){
-  try{localStorage.setItem("cw:greens",JSON.stringify(greens));}catch(e){setStatus("Couldn't save — storage unavailable");}
+  try{
+    localStorage.setItem("cw:greens",JSON.stringify(greens));
+    localStorage.setItem("cw:tees",JSON.stringify(teePts));
+  }catch(e){setStatus("Couldn't save — storage unavailable");}
 }
 
 /* ---------------- map ---------------- */
@@ -226,14 +235,20 @@ L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
   {maxZoom:21,attribution:"Imagery © Google"}).addTo(map);
 
 const flagIcon=(n)=>L.divIcon({className:"pinicon",html:`<div class="flag">⛳</div><div style="text-align:center;font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000;margin-top:-6px">${n}</div>`,iconSize:[30,40],iconAnchor:[15,30]});
+const teeIcon=(n)=>L.divIcon({className:"pinicon",html:`<div style="width:14px;height:14px;margin:0 auto;background:#c9a44c;border:2px solid #fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.6)"></div><div style="text-align:center;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000">${n}</div>`,iconSize:[24,28],iconAnchor:[12,10]});
 const meIcon=L.divIcon({className:"melabel",html:'<div class="dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
 
-let greenMarkers={}, meMarker=null, lineToGreen=null, tapMarker=null, lineToTap=null;
+let greenMarkers={}, teeMarkers={}, meMarker=null, lineToGreen=null, tapMarker=null, lineToTap=null;
 
 function renderGreens(){
   Object.values(greenMarkers).forEach(m=>map.removeLayer(m)); greenMarkers={};
+  Object.values(teeMarkers).forEach(m=>map.removeLayer(m)); teeMarkers={};
   for(const h in greens){
     greenMarkers[h]=L.marker([greens[h].lat,greens[h].lng],{icon:flagIcon(h)}).addTo(map)
+      .on("click",()=>selectHole(+h));
+  }
+  for(const h in teePts){
+    teeMarkers[h]=L.marker([teePts[h].lat,teePts[h].lng],{icon:teeIcon(h)}).addTo(map)
       .on("click",()=>selectHole(+h));
   }
   renderStrip();
@@ -310,16 +325,22 @@ function updateReadout(){
   if(!myPos){dEl.textContent="—";sub.innerHTML="<span>to centre of green · start GPS</span>";drawLines();return;}
   const gp=[g.lat,g.lng];
   const d=Math.round(distYds(myPos,gp));
-  dEl.textContent=d;
+  const tp=teePts[curHole];
+  const onTee=tp && distYds(myPos,[tp.lat,tp.lng])<=TEE_RADIUS_Y;
+  if(onTee){
+    dEl.textContent=HOLES[curHole].y[tee];
+    sub.innerHTML=`<span>scorecard · <b style="text-transform:capitalize">${tee}</b> tees</span><span>GPS line: <b>${d}</b></span>`;
+  }else{
+    dEl.textContent=d;
+    sub.innerHTML=`<span>to centre of green</span>`;
+  }
   dEl.classList.toggle("stale",Date.now()-lastFix>10000);
-  let extra="";
   if(tapTarget){
     const a=Math.round(distYds(myPos,tapTarget));
     const b=Math.round(distYds(tapTarget,gp));
     document.getElementById("tapline").style.display="flex";
     document.getElementById("tapline").textContent=`Tap point: ${a} yds to it · ${b} yds from it to green`;
   }
-  sub.innerHTML=`<span>to centre of green</span>`;
   drawLines();
 }
 
@@ -341,9 +362,10 @@ function clearTapUI(){
 /* ---------------- map taps ---------------- */
 map.on("click",async e=>{
   if(mode==="setup"){
-    greens[curHole]={lat:e.latlng.lat,lng:e.latlng.lng};
+    const pt={lat:e.latlng.lat,lng:e.latlng.lng};
+    if(setupTarget==="green") greens[curHole]=pt; else teePts[curHole]=pt;
     await saveGreens(); renderGreens(); updateReadout();
-    setStatus(`Hole ${curHole} green saved ✔`);
+    setStatus(`Hole ${curHole} ${setupTarget==="green"?"green":"tee box"} saved ✔`);
   }else{
     tapTarget=[e.latlng.lat,e.latlng.lng];
     if(tapMarker) tapMarker.setLatLng(tapTarget);
@@ -367,15 +389,20 @@ document.getElementById("modeToggle").onclick=()=>{
   setStatus(mode==="setup"?"Setup: zoom into each green and tap its centre.":"");
 };
 document.getElementById("setupNext").onclick=()=>{ if(curHole<18) selectHole(curHole+1); };
+document.getElementById("setupTarget").onclick=()=>{
+  setupTarget=setupTarget==="green"?"tee":"green";
+  document.getElementById("setupTarget").textContent="TARGET: "+(setupTarget==="green"?"GREEN":"TEE");
+  document.getElementById("setupWhat").textContent=setupTarget==="green"?"centre of the green":"middle of the tee boxes";
+};
 document.getElementById("btnExport").onclick=async()=>{
-  const n=Object.keys(greens).length;
-  if(n===0){setStatus("Nothing to export — map some greens first.");return;}
-  const txt=JSON.stringify(greens);
+  const nG=Object.keys(greens).length, nT=Object.keys(teePts).length;
+  if(nG+nT===0){setStatus("Nothing to export — map greens/tees first.");return;}
+  const txt=JSON.stringify({greens:greens,tees:teePts});
   try{
     await navigator.clipboard.writeText(txt);
-    setStatus(`Copied ${n} green${n>1?"s":""} to clipboard ✔ — paste into BAKED_GREENS or send to Claude.`);
+    setStatus(`Copied ${nG} greens + ${nT} tees ✔ — send to Claude or paste into BAKED constants.`);
   }catch(e){
-    prompt("Copy this and paste it into BAKED_GREENS (or send to Claude):",txt);
+    prompt("Copy this and send to Claude:",txt);
   }
 };
 document.getElementById("btnGPS").onclick=startGPS;
@@ -391,6 +418,7 @@ document.querySelectorAll(".tee").forEach(t=>t.onclick=async()=>{
   tee=t.dataset.t;
   document.querySelectorAll(".tee").forEach(x=>x.classList.toggle("sel",x===t));
   try{localStorage.setItem("cw:tee",tee);}catch(e){}
+  updateReadout();
 });
 function setStatus(s){document.getElementById("status").textContent=s;}
 
