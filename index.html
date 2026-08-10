@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Caledon Woods GPS</title>
+<title>GPS Caddie</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
@@ -24,11 +24,24 @@
 
   /* ---------- top bar ---------- */
   #topbar{background:var(--navy);color:var(--paper);padding:10px 14px 8px;display:flex;align-items:center;justify-content:space-between;z-index:1200}
-  #topbar .brand{line-height:1.05}
-  #topbar .brand b{font-size:15px;letter-spacing:.14em;font-weight:700}
-  #topbar .brand span{display:block;font-size:9.5px;letter-spacing:.28em;color:var(--gold)}
+  #courseBtn{background:transparent;border:none;color:var(--paper);text-align:left;line-height:1.05;cursor:pointer;padding:0}
+  #courseBtn b{font-size:15px;letter-spacing:.1em;font-weight:700}
+  #courseBtn b::after{content:" ▾";color:var(--gold);font-size:12px}
+  #courseBtn span{display:block;font-size:9.5px;letter-spacing:.28em;color:var(--gold)}
   #modeToggle{background:transparent;border:1px solid rgba(201,164,76,.6);color:var(--gold);font-size:11px;letter-spacing:.1em;padding:7px 12px;border-radius:20px;cursor:pointer}
   #modeToggle.setup{background:var(--gold);color:var(--navy);border-color:var(--gold)}
+
+  /* ---------- course picker ---------- */
+  #coursePicker{position:fixed;inset:0;background:rgba(14,42,74,.6);display:none;z-index:2100}
+  #coursePicker.open{display:flex;flex-direction:column;justify-content:flex-end}
+  #coursePanel{background:var(--paper);border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))}
+  #coursePanel h2{font-size:13px;letter-spacing:.2em;color:var(--navy);margin-bottom:12px}
+  .courseRow{width:100%;display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #ded7c6;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;text-align:left}
+  .courseRow.cur{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,164,76,.3)}
+  .courseRow .cn{font-weight:800;color:var(--navy);font-size:15px}
+  .courseRow .cm{font-size:11px;color:#5a6b80;margin-top:2px}
+  .courseRow .badge{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--green)}
+  .courseRow .badge.warn{color:#a1892f}
 
   /* ---------- hole strip ---------- */
   #holestrip{background:var(--navy2);display:flex;overflow-x:auto;scrollbar-width:none;padding:6px 8px;gap:5px;z-index:1200}
@@ -38,7 +51,6 @@
   .holechip .p{font-size:9px;letter-spacing:.05em}
   .holechip.active{background:var(--paper);color:var(--navy);border-color:var(--gold)}
   .holechip.mapped .n::after{content:"•";color:var(--green);margin-left:2px}
-  .holechip.active.mapped .n::after{color:var(--green)}
 
   /* ---------- map ---------- */
   #map{flex:1;position:relative;z-index:1}
@@ -50,7 +62,6 @@
   #holeinfo{font-size:13px;font-weight:700;letter-spacing:.04em}
   #holeinfo small{font-weight:400;color:#5a6b80}
   #teeYdg{font-size:11px;color:#5a6b80;margin-top:2px}
-  #teeYdg b{color:var(--ink)}
   .bigline{display:flex;align-items:baseline;justify-content:center;gap:10px;margin:2px 0 0}
   #distance{font-size:64px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
   #distance.stale{color:#8a97a8}
@@ -67,6 +78,22 @@
   #btnScore{background:var(--gold);color:var(--navy)}
   #btnClearTap{background:#e6e0d2;color:var(--navy);display:none}
 
+  /* setup banner */
+  #setupBanner{display:none;background:var(--gold);color:var(--navy);font-size:12.5px;font-weight:600;text-align:center;padding:7px 12px;z-index:1200}
+  body.setup #setupBanner{display:block}
+  body.setup #btnNearest{display:none}
+  #setupBanner button{margin-left:6px;background:var(--navy);color:var(--gold);border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer}
+
+  /* tee selector */
+  #tees{display:flex;gap:6px}
+  .tee{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.15);cursor:pointer}
+  .tee.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,164,76,.4)}
+
+  .pinicon{background:transparent}
+  .pinicon .flag{font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
+  .melabel{background:transparent}
+  .melabel .dot{width:16px;height:16px;border-radius:50%;background:#2b6cb0;border:3px solid #fff;box-shadow:0 0 0 3px rgba(43,108,176,.35),0 1px 4px rgba(0,0,0,.5)}
+
   /* ---------- score sheet ---------- */
   #scoreSheet{position:fixed;left:0;right:0;bottom:0;top:0;background:rgba(14,42,74,.55);display:none;z-index:2000}
   #scoreSheet.open{display:flex;flex-direction:column;justify-content:flex-end}
@@ -78,7 +105,6 @@
   #scoreTabs button{flex:1;border:1px solid var(--navy);background:transparent;color:var(--navy);border-radius:8px;padding:8px 0;font-size:12px;font-weight:700;cursor:pointer}
   #scoreTabs button.on{background:var(--navy);color:var(--paper)}
   #scoreBody{overflow-y:auto;padding:0 16px 16px}
-
   .prow{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #ded7c6;border-radius:12px;padding:10px 12px;margin-bottom:8px}
   .prow .pname{font-weight:700;color:var(--navy);font-size:14px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .prow .ptot{font-size:11px;color:#5a6b80;margin-right:10px;white-space:nowrap}
@@ -89,7 +115,6 @@
   .scoreactions{display:flex;gap:8px;margin-top:6px}
   .scoreactions button{flex:1;border:none;border-radius:10px;padding:10px 0;font-size:12px;font-weight:700;cursor:pointer;background:#e6e0d2;color:var(--navy)}
   .scoreactions .danger{color:var(--red)}
-
   table.card{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
   table.card th,table.card td{border:1px solid #d8d0bd;padding:4px 2px;text-align:center}
   table.card th{background:var(--navy);color:var(--paper);font-weight:700}
@@ -99,37 +124,14 @@
   table.card .over{color:var(--blue)}
   .topar{font-size:12px;text-align:center;color:#5a6b80;margin-top:8px}
   .topar b{color:var(--navy)}
-
-  /* setup banner */
-  #setupBanner{display:none;background:var(--gold);color:var(--navy);font-size:12.5px;font-weight:600;text-align:center;padding:7px 12px;z-index:1200}
-  body.setup #setupBanner{display:block}
-  body.setup #btnNearest{display:none}
-  #setupBanner button{margin-left:8px;background:var(--navy);color:var(--gold);border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
-
-  /* tee selector */
-  #tees{display:flex;gap:6px}
-  .tee{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
-  .tee[data-t=blue]{background:#2b6cb0}.tee[data-t=white]{background:#fff;border-color:#bbb}
-  .tee[data-t=green]{background:#1e7a45}.tee[data-t=red]{background:#c0392b}
-  .tee.sel{border-color:var(--gold);box-shadow:0 0 0 2px rgba(201,164,76,.4)}
-
-  .pinicon{background:transparent}
-  .pinicon .flag{font-size:26px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6))}
-  .melabel{background:transparent}
-  .melabel .dot{width:16px;height:16px;border-radius:50%;background:#2b6cb0;border:3px solid #fff;box-shadow:0 0 0 3px rgba(43,108,176,.35),0 1px 4px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="topbar">
-    <div class="brand"><b>CALEDON WOODS</b><span>GPS CADDIE</span></div>
+    <button id="courseBtn"><b>COURSE</b><span>GPS CADDIE</span></button>
     <div style="display:flex;align-items:center;gap:10px">
-      <div id="tees">
-        <div class="tee sel" data-t="blue" title="Blue"></div>
-        <div class="tee" data-t="white" title="White"></div>
-        <div class="tee" data-t="green" title="Green"></div>
-        <div class="tee" data-t="red" title="Red"></div>
-      </div>
+      <div id="tees"></div>
       <button id="modeToggle">SETUP</button>
     </div>
   </div>
@@ -146,7 +148,7 @@
   <div id="readout">
     <div class="row1">
       <div>
-        <div id="holeinfo">Hole 1 <small>· Par 4 · Hcp 6</small></div>
+        <div id="holeinfo">Hole 1</div>
         <div id="teeYdg"></div>
       </div>
       <div style="text-align:right;font-size:11px;color:#5a6b80" id="gpsmeta">GPS off</div>
@@ -164,72 +166,132 @@
   </div>
 </div>
 
+<div id="coursePicker">
+  <div id="coursePanel">
+    <h2>CHOOSE COURSE</h2>
+    <div id="courseList"></div>
+  </div>
+</div>
+
 <div id="scoreSheet">
   <div id="scorePanel">
-    <div id="scoreHead"><b id="scoreTitle">SCORE — HOLE 1</b><button class="x" id="scoreClose">✕</button></div>
+    <div id="scoreHead"><b id="scoreTitle">SCORE</b><button class="x" id="scoreClose">✕</button></div>
     <div id="scoreTabs">
       <button id="tabHole" class="on">THIS HOLE</button>
       <button id="tabCard">SCORECARD</button>
+      <button id="tabHist">ROUNDS</button>
     </div>
     <div id="scoreBody"></div>
   </div>
 </div>
 
 <script>
-/* ---------------- scorecard data (Caledon Woods) ---------------- */
-const HOLES = {
- 1:{par:4,hcp:6, y:{blue:414,white:383,green:335,red:335}},
- 2:{par:4,hcp:16,y:{blue:320,white:303,green:303,red:208}},
- 3:{par:3,hcp:8, y:{blue:184,white:172,green:140,red:140}},
- 4:{par:4,hcp:10,y:{blue:315,white:292,green:292,red:233}},
- 5:{par:3,hcp:14,y:{blue:191,white:175,green:175,red:110}},
- 6:{par:4,hcp:2, y:{blue:407,white:379,green:379,red:307}},
- 7:{par:4,hcp:18,y:{blue:294,white:282,green:282,red:243}},
- 8:{par:5,hcp:12,y:{blue:515,white:496,green:421,red:421}},
- 9:{par:4,hcp:4, y:{blue:440,white:417,green:303,red:303}},
- 10:{par:5,hcp:13,y:{blue:531,white:514,green:388,red:388}},
- 11:{par:3,hcp:15,y:{blue:176,white:166,green:166,red:125}},
- 12:{par:5,hcp:5, y:{blue:540,white:528,green:415,red:415}},
- 13:{par:3,hcp:17,y:{blue:166,white:152,green:152,red:110}},
- 14:{par:4,hcp:11,y:{blue:359,white:339,green:339,red:242}},
- 15:{par:"4/5",hcp:1,y:{blue:413,white:402,green:402,red:220}},
- 16:{par:4,hcp:9, y:{blue:341,white:330,green:330,red:270}},
- 17:{par:4,hcp:3, y:{blue:415,white:400,green:290,red:290}},
- 18:{par:4,hcp:7, y:{blue:394,white:375,green:295,red:295}}
+/* =====================================================================
+   COURSE REGISTRY — to add a course, send Claude the scorecard; a new
+   entry gets added here with holes + (after mapping) greens and tees.
+   ===================================================================== */
+const COURSES = {
+
+  caledonwoods: {
+    name: "Caledon Woods",
+    short: "CALEDON WOODS",
+    center: [43.9186, -79.7933],
+    tees: [
+      {id:"blue",  label:"Blue",  color:"#2b6cb0"},
+      {id:"white", label:"White", color:"#ffffff"},
+      {id:"green", label:"Green", color:"#1e7a45"},
+      {id:"red",   label:"Red",   color:"#c0392b"}
+    ],
+    holes: {
+      1:{par:4,hcp:6, y:{blue:414,white:383,green:335,red:335}},
+      2:{par:4,hcp:16,y:{blue:320,white:303,green:303,red:208}},
+      3:{par:3,hcp:8, y:{blue:184,white:172,green:140,red:140}},
+      4:{par:4,hcp:10,y:{blue:315,white:292,green:292,red:233}},
+      5:{par:3,hcp:14,y:{blue:191,white:175,green:175,red:110}},
+      6:{par:4,hcp:2, y:{blue:407,white:379,green:379,red:307}},
+      7:{par:4,hcp:18,y:{blue:294,white:282,green:282,red:243}},
+      8:{par:5,hcp:12,y:{blue:515,white:496,green:421,red:421}},
+      9:{par:4,hcp:4, y:{blue:440,white:417,green:303,red:303}},
+      10:{par:5,hcp:13,y:{blue:531,white:514,green:388,red:388}},
+      11:{par:3,hcp:15,y:{blue:176,white:166,green:166,red:125}},
+      12:{par:5,hcp:5, y:{blue:540,white:528,green:415,red:415}},
+      13:{par:3,hcp:17,y:{blue:166,white:152,green:152,red:110}},
+      14:{par:4,hcp:11,y:{blue:359,white:339,green:339,red:242}},
+      15:{par:"4/5",hcp:1,y:{blue:413,white:402,green:402,red:220}},
+      16:{par:4,hcp:9, y:{blue:341,white:330,green:330,red:270}},
+      17:{par:4,hcp:3, y:{blue:415,white:400,green:290,red:290}},
+      18:{par:4,hcp:7, y:{blue:394,white:375,green:295,red:295}}
+    },
+    greens: {"1":{"lat":43.92200584445358,"lng":-79.79811962402893},"2":{"lat":43.92239136317246,"lng":-79.802253395319},"3":{"lat":43.92064097334304,"lng":-79.80419334592172},"4":{"lat":43.918586867932,"lng":-79.80126842948722},"5":{"lat":43.91695928444444,"lng":-79.8000312039767},"6":{"lat":43.9136645289225,"lng":-79.79880809783936},"7":{"lat":43.91176357552742,"lng":-79.80140447616579},"8":{"lat":43.91518245039558,"lng":-79.80604583088395},"9":{"lat":43.914023929986094,"lng":-79.80115520577328},"10":{"lat":43.917133158279796,"lng":-79.80383187532426},"11":{"lat":43.917048338479816,"lng":-79.801624417305},"12":{"lat":43.913548981744945,"lng":-79.79628682136537},"13":{"lat":43.91243564524109,"lng":-79.79475005938754},"14":{"lat":43.911889367261914,"lng":-79.79093849658967},"15":{"lat":43.9153362597304,"lng":-79.78864345603144},"16":{"lat":43.91814383771622,"lng":-79.79288175702095},"17":{"lat":43.91772375720363,"lng":-79.79869214834936},"18":{"lat":43.91913981643108,"lng":-79.79483574628831}},
+    teePts: {"1":{"lat":43.91973167561164,"lng":-79.79476243819592},"2":{"lat":43.92059733505867,"lng":-79.80035305023195},"3":{"lat":43.92163688157413,"lng":-79.80306672596727},"4":{"lat":43.919940451445015,"lng":-79.8038050532341},"5":{"lat":43.91812948144832,"lng":-79.80054904212922},"6":{"lat":43.91615220836564,"lng":-79.80119913414912},"7":{"lat":43.913479035026185,"lng":-79.79968249797821},"8":{"lat":43.91286071786275,"lng":-79.80180144309999},"9":{"lat":43.91566280253892,"lng":-79.80522662401201},"10":{"lat":43.914027786127996,"lng":-79.80035841464998},"11":{"lat":43.91746695392961,"lng":-79.80282910425105},"12":{"lat":43.91632765514424,"lng":-79.80051934719087},"13":{"lat":43.91324330236535,"lng":-79.79576110839845},"14":{"lat":43.912787292272846,"lng":-79.79400694370271},"15":{"lat":43.91312601534871,"lng":-79.7900627553463},"16":{"lat":43.9162735552387,"lng":-79.7901177406311},"17":{"lat":43.91876006906287,"lng":-79.79452794811097},"18":{"lat":43.918125398235276,"lng":-79.79874808447677}}
+  },
+
+  woodensticks: {
+    name: "Wooden Sticks",
+    short: "WOODEN STICKS",
+    center: [44.103, -79.135],
+    outCount: 9,
+    tees: [
+      {id:"oak",    label:"Oak (Black)",   color:"#1a1a1a"},
+      {id:"maple",  label:"Maple (Green)", color:"#1e7a45"},
+      {id:"birch",  label:"Birch (Blue)",  color:"#2b6cb0"},
+      {id:"pine",   label:"Pine (White)",  color:"#ffffff"},
+      {id:"cedar",  label:"Cedar (Yellow)",color:"#e0b62b"},
+      {id:"spruce", label:"Spruce (Red)",  color:"#c0392b"}
+    ],
+    holes: {
+      1:{par:4,hcp:4, y:{oak:451,maple:442,birch:416,pine:408,cedar:370,spruce:340}},
+      2:{par:4,hcp:14,y:{oak:331,maple:327,birch:316,pine:308,cedar:308,spruce:253}},
+      3:{par:3,hcp:16,y:{oak:188,maple:183,birch:155,pine:142,cedar:128,spruce:128}},
+      4:{par:5,hcp:10,y:{oak:510,maple:495,birch:482,pine:472,cedar:472,spruce:370}},
+      5:{par:4,hcp:12,y:{oak:331,maple:319,birch:315,pine:268,cedar:268,spruce:228}},
+      6:{par:4,hcp:2, y:{oak:458,maple:448,birch:422,pine:385,cedar:340,spruce:270}},
+      7:{par:4,hcp:6, y:{oak:398,maple:387,birch:384,pine:346,cedar:346,spruce:303}},
+      8:{par:3,hcp:18,y:{oak:230,maple:206,birch:192,pine:179,cedar:152,spruce:152}},
+      9:{par:5,hcp:8, y:{oak:548,maple:525,birch:515,pine:478,cedar:444,spruce:369}},
+      10:{par:4,hcp:11,y:{oak:385,maple:379,birch:372,pine:368,cedar:347,spruce:347}},
+      11:{par:3,hcp:17,label:"11A",y:{oak:145,maple:140,birch:132,pine:120,cedar:120,spruce:110}},
+      11.5:{par:3,hcp:17,label:"11B",alt:true,y:{oak:170,maple:165,birch:157,pine:145,cedar:145,spruce:135}},
+      12:{par:4,hcp:1, y:{oak:462,maple:427,birch:410,pine:400,cedar:343,spruce:303}},
+      13:{par:4,hcp:3, y:{oak:485,maple:439,birch:420,pine:410,cedar:373,spruce:300}},
+      14:{par:5,hcp:9, y:{oak:508,maple:500,birch:482,pine:451,cedar:451,spruce:427}},
+      15:{par:4,hcp:5, y:{oak:480,maple:468,birch:438,pine:430,cedar:387,spruce:302}},
+      16:{par:5,hcp:7, y:{oak:570,maple:562,birch:548,pine:542,cedar:487,spruce:425}},
+      17:{par:3,hcp:15,y:{oak:135,maple:126,birch:124,pine:110,cedar:110,spruce:91}},
+      18:{par:4,hcp:13,y:{oak:410,maple:398,birch:352,pine:345,cedar:345,spruce:307}}
+    },
+    greens: {},
+    teePts: {}
+  }
+
 };
-const COURSE_CENTER=[43.9186,-79.7933]; // Caledon Woods GC – 15608 Regional Rd 50, Bolton
-/* ===== PASTE EXPORTED GREEN COORDINATES BETWEEN THE BRACES BELOW =====
-   Do Setup once, tap EXPORT GREENS, then replace {} with the copied block. */
-const BAKED_GREENS = {"1":{"lat":43.92200584445358,"lng":-79.79811962402893},"2":{"lat":43.92239136317246,"lng":-79.802253395319},"3":{"lat":43.92064097334304,"lng":-79.80419334592172},"4":{"lat":43.918586867932,"lng":-79.80126842948722},"5":{"lat":43.91695928444444,"lng":-79.8000312039767},"6":{"lat":43.9136645289225,"lng":-79.79880809783936},"7":{"lat":43.91176357552742,"lng":-79.80140447616579},"8":{"lat":43.91518169270598,"lng":-79.80603933334352},"9":{"lat":43.91403203699115,"lng":-79.8011550307274},"10":{"lat":43.91712929405476,"lng":-79.80382651090623},"11":{"lat":43.917048338479816,"lng":-79.801624417305},"12":{"lat":43.913548981744945,"lng":-79.79628682136537},"13":{"lat":43.91243564524109,"lng":-79.79475005938754},"14":{"lat":43.911889367261914,"lng":-79.79093849658967},"15":{"lat":43.9153362597304,"lng":-79.78864345603144},"16":{"lat":43.91814383771622,"lng":-79.79288175702095},"17":{"lat":43.91772375720363,"lng":-79.79869214834936},"18":{"lat":43.91913981643108,"lng":-79.79483574628831}};
 /* ===================================================================== */
-/* Tee-box locations (centre of each tee complex) — same export workflow */
-const BAKED_TEES = {"1":{"lat":43.91973167561164,"lng":-79.79476243819592},"2":{"lat":43.92059733505867,"lng":-79.80035305023195},"3":{"lat":43.92163688157413,"lng":-79.80306672596727},"4":{"lat":43.919940451445015,"lng":-79.8038050532341},"5":{"lat":43.91812948144832,"lng":-79.80054904212922},"6":{"lat":43.91615220836564,"lng":-79.80119913414912},"7":{"lat":43.913479035026185,"lng":-79.79968249797821},"8":{"lat":43.91286071786275,"lng":-79.80180144309999},"9":{"lat":43.91566280253892,"lng":-79.80522662401201},"10":{"lat":43.914027786127996,"lng":-79.80035841464998},"11":{"lat":43.91746695392961,"lng":-79.80282910425105},"12":{"lat":43.91632765514424,"lng":-79.80051934719087},"13":{"lat":43.91324330236535,"lng":-79.79576110839845},"14":{"lat":43.912787292272846,"lng":-79.79400694370271},"15":{"lat":43.91312601534871,"lng":-79.7900627553463},"16":{"lat":43.9162735552387,"lng":-79.7901177406311},"17":{"lat":43.91876006906287,"lng":-79.79452794811097},"18":{"lat":43.918125398235276,"lng":-79.79874808447677}};
-const TEE_RADIUS_Y = 40;   // within this many yards of the tee marker = "tee mode"
-const M2Y=1.09361;
 
-let mode="play", curHole=1, tee="blue", setupTarget="green";
-let greens={}, teePts={};    // {hole:{lat,lng}}
-let myPos=null, watchId=null, lastFix=0;
-let tapTarget=null;
+const TEE_RADIUS_Y = 40;
+const M2Y = 1.09361;
 
-/* ---------------- storage ---------------- */
-async function loadGreens(){
-  let localG={}, localT={};
-  try{const v=localStorage.getItem("cw:greens"); if(v) localG=JSON.parse(v);}catch(e){}
-  try{const v=localStorage.getItem("cw:tees"); if(v) localT=JSON.parse(v);}catch(e){}
-  greens={...BAKED_GREENS,...localG};
-  teePts={...BAKED_TEES,...localT};
-  try{const t=localStorage.getItem("cw:tee"); if(t){tee=t; document.querySelectorAll(".tee").forEach(x=>x.classList.toggle("sel",x.dataset.t===tee));}}catch(e){}
-}
-async function saveGreens(){
-  try{
-    localStorage.setItem("cw:greens",JSON.stringify(greens));
-    localStorage.setItem("cw:tees",JSON.stringify(teePts));
-  }catch(e){setStatus("Couldn't save — storage unavailable");}
+let courseId = null, C = null;          // current course object
+let mode="play", curHole=1, tee=null, setupTarget="green";
+let greens={}, teePts={};
+let myPos=null, watchId=null, lastFix=0, tapTarget=null;
+let players=[{name:"Me",scores:{}}], scoreTab="hole";
+
+const $=id=>document.getElementById(id);
+const holeNums=()=>Object.keys(C.holes).map(Number).sort((a,b)=>a-b);
+const lastHole=()=>holeNums()[holeNums().length-1];
+const numPar=h=>parseInt(C.holes[h].par);
+const holeLabel=h=>C.holes[h].label||h;
+const outCount=()=>C.outCount||Math.ceil(holeNums().length/2);
+function setStatus(s){$("status").textContent=s;}
+function distYds(a,b){
+  const R=6371000,toR=x=>x*Math.PI/180;
+  const dLat=toR(b[0]-a[0]),dLng=toR(b[1]-a[1]);
+  const s=Math.sin(dLat/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s))*M2Y;
 }
 
 /* ---------------- map ---------------- */
-const map=L.map("map",{zoomControl:false,attributionControl:true}).setView(COURSE_CENTER,16);
+const map=L.map("map",{zoomControl:false,attributionControl:true}).setView([43.9,-79.79],15);
 L.control.zoom({position:"topright"}).addTo(map);
 L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
   {maxZoom:21,attribution:"Imagery © Google"}).addTo(map);
@@ -237,43 +299,144 @@ L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
 const flagIcon=(n)=>L.divIcon({className:"pinicon",html:`<div class="flag">⛳</div><div style="text-align:center;font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000;margin-top:-6px">${n}</div>`,iconSize:[30,40],iconAnchor:[15,30]});
 const teeIcon=(n)=>L.divIcon({className:"pinicon",html:`<div style="width:14px;height:14px;margin:0 auto;background:#c9a44c;border:2px solid #fff;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,.6)"></div><div style="text-align:center;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000">${n}</div>`,iconSize:[24,28],iconAnchor:[12,10]});
 const meIcon=L.divIcon({className:"melabel",html:'<div class="dot"></div>',iconSize:[16,16],iconAnchor:[8,8]});
-
 let greenMarkers={}, teeMarkers={}, meMarker=null, lineToGreen=null, tapMarker=null, lineToTap=null;
 
-function renderGreens(){
+/* ---------------- course switching ---------------- */
+function loadCourse(id, firstLoad){
+  courseId=id; C=COURSES[id];
+  try{localStorage.setItem("app:course",id);}catch(e){}
+  // per-course data: baked + local overrides
+  let localG={}, localT={};
+  try{const v=localStorage.getItem(id+":greens"); if(v) localG=JSON.parse(v);}catch(e){}
+  try{const v=localStorage.getItem(id+":tees");  if(v) localT=JSON.parse(v);}catch(e){}
+  greens={...(C.greens||{}),...localG};
+  teePts={...(C.teePts||{}),...localT};
+  // tee preference
+  tee=null;
+  try{tee=localStorage.getItem(id+":tee");}catch(e){}
+  if(!tee || !C.tees.some(t=>t.id===tee)) tee=C.tees[0].id;
+  // players per course
+  players=[{name:"Me",scores:{}}];
+  try{const v=localStorage.getItem(id+":players"); if(v){const p=JSON.parse(v); if(Array.isArray(p)&&p.length)players=p;}}catch(e){}
+  // UI
+  $("courseBtn").innerHTML=`<b>${C.short}</b><span>GPS CADDIE</span>`;
+  renderTeeDots();
+  renderMarkers();
+  tapTarget=null; clearTapUI();
+  selectHole(holeNums()[0]);
+  if(!firstLoad || !myPos) map.setView(C.center, 16);
+  closeCoursePicker();
+}
+function saveMapped(){
+  try{
+    localStorage.setItem(courseId+":greens",JSON.stringify(greens));
+    localStorage.setItem(courseId+":tees",JSON.stringify(teePts));
+  }catch(e){setStatus("Couldn't save — storage unavailable");}
+}
+function saveScores(){
+  try{localStorage.setItem(courseId+":players",JSON.stringify(players));}catch(e){}
+}
+function loadHistory(){
+  try{const v=localStorage.getItem("app:history"); if(v) return JSON.parse(v);}catch(e){}
+  return [];
+}
+function saveHistory(h){
+  try{localStorage.setItem("app:history",JSON.stringify(h.slice(0,50)));}catch(e){}
+}
+function finishRound(){
+  const active=players.filter(p=>Object.keys(p.scores).length>0);
+  if(!active.length){setStatus("No scores to save yet.");return;}
+  if(!confirm("Save this round to history and clear the card for a fresh round?"))return;
+  const hist=loadHistory();
+  hist.unshift({
+    d:new Date().toISOString().slice(0,10),
+    c:courseId,
+    players:active.map(p=>{const st=pStats(p);return{name:p.name,tot:st.tot,toPar:st.toPar,played:st.played,scores:{...p.scores}};})
+  });
+  saveHistory(hist);
+  players.forEach(p=>p.scores={}); saveScores();
+  scoreTab="hist"; renderScore();
+}
+
+/* ---------------- course picker ---------------- */
+function openCoursePicker(){
+  const list=$("courseList"); list.innerHTML="";
+  for(const id in COURSES){
+    const c=COURSES[id];
+    const mapped=Object.keys(c.greens||{}).length;
+    const total=Object.keys(c.holes).length;
+    const row=document.createElement("button");
+    row.className="courseRow"+(id===courseId?" cur":"");
+    row.innerHTML=`<span><span class="cn">${c.name}</span><br><span class="cm">${total} holes · par ${coursePar(c)}</span></span>
+      <span class="badge ${mapped>=total?"":"warn"}">${mapped>=total?"READY":mapped+"/"+total+" GREENS"}</span>`;
+    row.onclick=()=>loadCourse(id,false);
+    list.appendChild(row);
+  }
+  $("coursePicker").classList.add("open");
+}
+function closeCoursePicker(){$("coursePicker").classList.remove("open");}
+function coursePar(c){
+  let p=0; for(const h in c.holes){ if(!c.holes[h].alt) p+=parseInt(c.holes[h].par); } return p;
+}
+$("courseBtn").onclick=openCoursePicker;
+$("coursePicker").onclick=e=>{if(e.target.id==="coursePicker")closeCoursePicker();};
+
+/* ---------------- tee dots ---------------- */
+function renderTeeDots(){
+  const box=$("tees"); box.innerHTML="";
+  C.tees.forEach(t=>{
+    const d=document.createElement("div");
+    d.className="tee"+(t.id===tee?" sel":"");
+    d.style.background=t.color;
+    d.title=t.label;
+    d.onclick=()=>{
+      tee=t.id;
+      try{localStorage.setItem(courseId+":tee",tee);}catch(e){}
+      renderTeeDots(); showHoleInfo(); updateReadout();
+    };
+    box.appendChild(d);
+  });
+}
+function teeLabel(){const t=C.tees.find(x=>x.id===tee);return t?t.label:tee;}
+
+/* ---------------- markers / strip ---------------- */
+function renderMarkers(){
   Object.values(greenMarkers).forEach(m=>map.removeLayer(m)); greenMarkers={};
   Object.values(teeMarkers).forEach(m=>map.removeLayer(m)); teeMarkers={};
   for(const h in greens){
-    greenMarkers[h]=L.marker([greens[h].lat,greens[h].lng],{icon:flagIcon(h)}).addTo(map)
+    greenMarkers[h]=L.marker([greens[h].lat,greens[h].lng],{icon:flagIcon(holeLabel(h))}).addTo(map)
       .on("click",()=>selectHole(+h));
   }
   for(const h in teePts){
-    teeMarkers[h]=L.marker([teePts[h].lat,teePts[h].lng],{icon:teeIcon(h)}).addTo(map)
+    teeMarkers[h]=L.marker([teePts[h].lat,teePts[h].lng],{icon:teeIcon(holeLabel(h))}).addTo(map)
       .on("click",()=>selectHole(+h));
   }
   renderStrip();
 }
-
-/* ---------------- hole strip ---------------- */
 function renderStrip(){
-  const s=document.getElementById("holestrip"); s.innerHTML="";
-  for(let h=1;h<=18;h++){
+  const s=$("holestrip"); s.innerHTML="";
+  holeNums().forEach(h=>{
     const d=document.createElement("div");
     d.className="holechip"+(h===curHole?" active":"")+(greens[h]?" mapped":"");
-    d.innerHTML=`<span class="n">${h}</span><span class="p">P${HOLES[h].par}</span>`;
+    d.innerHTML=`<span class="n">${holeLabel(h)}</span><span class="p">P${C.holes[h].par}</span>`;
     d.onclick=()=>selectHole(h);
     s.appendChild(d);
-  }
+  });
   document.querySelector(".holechip.active")?.scrollIntoView({inline:"center",behavior:"smooth"});
 }
-
+function showHoleInfo(){
+  const d=C.holes[curHole];
+  $("holeinfo").innerHTML=`Hole ${holeLabel(curHole)} <small>· Par ${d.par}${d.hcp?" · Hcp "+d.hcp:""}</small>`;
+  $("teeYdg").innerHTML=C.tees.map(t=>{
+    const v=d.y[t.id]??"–";
+    const col=t.color==="#ffffff"?"#5a6b80":t.color;
+    return t.id===tee?`<b style="color:${col}">${v}</b>`:`<span style="color:${col}">${v}</span>`;
+  }).join(" / ")+" yds";
+}
 function selectHole(h){
   curHole=h; tapTarget=null; clearTapUI();
-  document.getElementById("setupHole").textContent=h;
-  const d=HOLES[h];
-  document.getElementById("holeinfo").innerHTML=`Hole ${h} <small>· Par ${d.par} · Hcp ${d.hcp}</small>`;
-  document.getElementById("teeYdg").innerHTML=
-    `<b style="color:#2b6cb0">${d.y.blue}</b> / ${d.y.white} / <span style="color:#1e7a45">${d.y.green}</span> / <span style="color:#c0392b">${d.y.red}</span> yds`;
+  $("setupHole").textContent=holeLabel(h);
+  showHoleInfo();
   if(greens[h]){
     const g=[greens[h].lat,greens[h].lng];
     if(myPos && mode==="play") map.fitBounds(L.latLngBounds([myPos,g]).pad(0.25));
@@ -289,47 +452,38 @@ function startGPS(){
   setStatus("Requesting location…");
   watchId=navigator.geolocation.watchPosition(p=>{
     myPos=[p.coords.latitude,p.coords.longitude]; lastFix=Date.now();
-    const acc=Math.round(p.coords.accuracy*M2Y);
-    document.getElementById("gpsmeta").innerHTML=`GPS ±${acc}y`;
+    $("gpsmeta").innerHTML=`GPS ±${Math.round(p.coords.accuracy*M2Y)}y`;
     if(!meMarker){meMarker=L.marker(myPos,{icon:meIcon}).addTo(map); map.setView(myPos,17);}
     else meMarker.setLatLng(myPos);
     updateReadout();
   },err=>{
     stopGPS();
     setStatus(err.code===1
-      ?"Location blocked. If this is running inside Claude, open the file in your phone's browser or deploy it (Firebase) — GPS needs a normal browser tab."
+      ?"Location blocked. Allow location for your browser in phone settings, then reload."
       :"GPS error: "+err.message);
   },{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
-  document.getElementById("btnGPS").textContent="GPS ON";
-  document.getElementById("btnGPS").classList.add("on");
+  $("btnGPS").textContent="GPS ON"; $("btnGPS").classList.add("on");
 }
 function stopGPS(){
   if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
-  document.getElementById("btnGPS").textContent="START GPS";
-  document.getElementById("btnGPS").classList.remove("on");
-  document.getElementById("gpsmeta").textContent="GPS off";
+  $("btnGPS").textContent="START GPS"; $("btnGPS").classList.remove("on");
+  $("gpsmeta").textContent="GPS off";
 }
 
-/* ---------------- distance ---------------- */
-function distYds(a,b){
-  const R=6371000,toR=x=>x*Math.PI/180;
-  const dLat=toR(b[0]-a[0]),dLng=toR(b[1]-a[1]);
-  const s=Math.sin(dLat/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(s))*M2Y;
-}
-
+/* ---------------- readout ---------------- */
 function updateReadout(){
-  const dEl=document.getElementById("distance"), sub=document.getElementById("sub");
+  const dEl=$("distance"), sub=$("sub");
   const g=greens[curHole];
   if(!g){dEl.textContent="—";sub.innerHTML="<span>green not mapped yet — use Setup</span>";drawLines();return;}
   if(!myPos){dEl.textContent="—";sub.innerHTML="<span>to centre of green · start GPS</span>";drawLines();return;}
   const gp=[g.lat,g.lng];
   const d=Math.round(distYds(myPos,gp));
   const tp=teePts[curHole];
-  const onTee=tp && distYds(myPos,[tp.lat,tp.lng])<=TEE_RADIUS_Y;
+  const cardY=C.holes[curHole].y[tee];
+  const onTee=tp && cardY!=null && distYds(myPos,[tp.lat,tp.lng])<=TEE_RADIUS_Y;
   if(onTee){
-    dEl.textContent=HOLES[curHole].y[tee];
-    sub.innerHTML=`<span>scorecard · <b style="text-transform:capitalize">${tee}</b> tees</span><span>GPS line: <b>${d}</b></span>`;
+    dEl.textContent=cardY;
+    sub.innerHTML=`<span>scorecard · <b>${teeLabel()}</b> tees</span><span>GPS line: <b>${d}</b></span>`;
   }else{
     dEl.textContent=d;
     sub.innerHTML=`<span>to centre of green</span>`;
@@ -338,12 +492,11 @@ function updateReadout(){
   if(tapTarget){
     const a=Math.round(distYds(myPos,tapTarget));
     const b=Math.round(distYds(tapTarget,gp));
-    document.getElementById("tapline").style.display="flex";
-    document.getElementById("tapline").textContent=`Tap point: ${a} yds to it · ${b} yds from it to green`;
+    $("tapline").style.display="flex";
+    $("tapline").textContent=`Tap point: ${a} yds to it · ${b} yds from it to green`;
   }
   drawLines();
 }
-
 function drawLines(){
   if(lineToGreen){map.removeLayer(lineToGreen);lineToGreen=null;}
   if(lineToTap){map.removeLayer(lineToTap);lineToTap=null;}
@@ -351,106 +504,92 @@ function drawLines(){
   if(myPos&&g) lineToGreen=L.polyline([myPos,[g.lat,g.lng]],{color:"#c9a44c",weight:3,dashArray:"6 6",opacity:.9}).addTo(map);
   if(myPos&&tapTarget) lineToTap=L.polyline([myPos,tapTarget],{color:"#2b6cb0",weight:3,opacity:.9}).addTo(map);
 }
-
 function clearTapUI(){
   if(tapMarker){map.removeLayer(tapMarker);tapMarker=null;}
-  document.getElementById("tapline").style.display="none";
-  document.getElementById("btnClearTap").style.display="none";
+  $("tapline").style.display="none";
+  $("btnClearTap").style.display="none";
   drawLines();
 }
 
 /* ---------------- map taps ---------------- */
-map.on("click",async e=>{
+map.on("click",e=>{
   if(mode==="setup"){
     const pt={lat:e.latlng.lat,lng:e.latlng.lng};
     if(setupTarget==="green") greens[curHole]=pt; else teePts[curHole]=pt;
-    await saveGreens(); renderGreens(); updateReadout();
-    setStatus(`Hole ${curHole} ${setupTarget==="green"?"green":"tee box"} saved ✔`);
+    saveMapped(); renderMarkers(); updateReadout();
+    setStatus(`Hole ${holeLabel(curHole)} ${setupTarget==="green"?"green":"tee box"} saved ✔`);
   }else{
     tapTarget=[e.latlng.lat,e.latlng.lng];
     if(tapMarker) tapMarker.setLatLng(tapTarget);
     else tapMarker=L.circleMarker(tapTarget,{radius:7,color:"#2b6cb0",fillColor:"#2b6cb0",fillOpacity:.85}).addTo(map);
-    document.getElementById("btnClearTap").style.display="block";
+    $("btnClearTap").style.display="block";
     if(!myPos && greens[curHole]){
       const b=Math.round(distYds(tapTarget,[greens[curHole].lat,greens[curHole].lng]));
-      document.getElementById("tapline").style.display="flex";
-      document.getElementById("tapline").textContent=`Tap point: ${b} yds to green centre`;
+      $("tapline").style.display="flex";
+      $("tapline").textContent=`Tap point: ${b} yds to green centre`;
       drawLines();
     } else updateReadout();
   }
 });
 
-/* ---------------- controls ---------------- */
-document.getElementById("modeToggle").onclick=()=>{
+/* ---------------- setup / export ---------------- */
+$("modeToggle").onclick=()=>{
   mode=mode==="play"?"setup":"play";
   document.body.classList.toggle("setup",mode==="setup");
-  document.getElementById("modeToggle").classList.toggle("setup",mode==="setup");
-  document.getElementById("modeToggle").textContent=mode==="setup"?"DONE":"SETUP";
-  setStatus(mode==="setup"?"Setup: zoom into each green and tap its centre.":"");
+  $("modeToggle").classList.toggle("setup",mode==="setup");
+  $("modeToggle").textContent=mode==="setup"?"DONE":"SETUP";
+  setStatus(mode==="setup"?`Setup for ${C.name}: tap each green (and tees) on the map.`:"");
 };
-document.getElementById("setupNext").onclick=()=>{ if(curHole<18) selectHole(curHole+1); };
-document.getElementById("setupTarget").onclick=()=>{
+$("setupNext").onclick=()=>{ if(curHole<lastHole()) selectHole(curHole+1); };
+$("setupTarget").onclick=()=>{
   setupTarget=setupTarget==="green"?"tee":"green";
-  document.getElementById("setupTarget").textContent="TARGET: "+(setupTarget==="green"?"GREEN":"TEE");
-  document.getElementById("setupWhat").textContent=setupTarget==="green"?"centre of the green":"middle of the tee boxes";
+  $("setupTarget").textContent="TARGET: "+(setupTarget==="green"?"GREEN":"TEE");
+  $("setupWhat").textContent=setupTarget==="green"?"centre of the green":"middle of the tee boxes";
 };
-document.getElementById("btnExport").onclick=async()=>{
+$("btnExport").onclick=async()=>{
   const nG=Object.keys(greens).length, nT=Object.keys(teePts).length;
   if(nG+nT===0){setStatus("Nothing to export — map greens/tees first.");return;}
-  const txt=JSON.stringify({greens:greens,tees:teePts});
+  const txt=JSON.stringify({course:courseId,greens:greens,tees:teePts});
   try{
     await navigator.clipboard.writeText(txt);
-    setStatus(`Copied ${nG} greens + ${nT} tees ✔ — send to Claude or paste into BAKED constants.`);
+    setStatus(`Copied ${nG} greens + ${nT} tees for ${C.name} ✔ — send to Claude.`);
   }catch(e){
     prompt("Copy this and send to Claude:",txt);
   }
 };
-document.getElementById("btnGPS").onclick=startGPS;
-document.getElementById("btnNearest").onclick=()=>{
+
+/* ---------------- buttons ---------------- */
+$("btnGPS").onclick=startGPS;
+$("btnNearest").onclick=()=>{
   if(!myPos){setStatus("Start GPS first.");return;}
   let best=null,bd=1e12;
   for(const h in greens){const d=distYds(myPos,[greens[h].lat,greens[h].lng]);if(d<bd){bd=d;best=+h;}}
   if(best){selectHole(best);setStatus(`Nearest green: hole ${best}`);}
   else setStatus("No greens mapped yet.");
 };
-document.getElementById("btnClearTap").onclick=()=>{tapTarget=null;clearTapUI();};
-document.querySelectorAll(".tee").forEach(t=>t.onclick=async()=>{
-  tee=t.dataset.t;
-  document.querySelectorAll(".tee").forEach(x=>x.classList.toggle("sel",x===t));
-  try{localStorage.setItem("cw:tee",tee);}catch(e){}
-  updateReadout();
-});
-function setStatus(s){document.getElementById("status").textContent=s;}
+$("btnClearTap").onclick=()=>{tapTarget=null;clearTapUI();};
 
 /* ---------------- scoring ---------------- */
-let players=[{name:"Me",scores:{}}], scoreTab="hole";
-const numPar=h=>parseInt(HOLES[h].par); // hole 15 "4/5" counts as 4
-
-function loadScores(){
-  try{const v=localStorage.getItem("cw:players"); if(v){const p=JSON.parse(v); if(Array.isArray(p)&&p.length)players=p;}}catch(e){}
-}
-function saveScores(){
-  try{localStorage.setItem("cw:players",JSON.stringify(players));}catch(e){}
-}
 function pStats(p){
+  const hs=holeNums(), half=outCount();
   let out=0,inn=0,parAcc=0,played=0;
-  for(let h=1;h<=18;h++){const s=p.scores[h];if(s){(h<=9?out+= s:inn+=s);parAcc+=numPar(h);played++;}}
+  hs.forEach((h,i)=>{const s=p.scores[h];if(s){(i<half?out+=s:inn+=s);parAcc+=numPar(h);played++;}});
   return{out,inn,tot:out+inn,toPar:(out+inn)-parAcc,played};
 }
 const fmtToPar=n=>n===0?"E":(n>0?"+"+n:""+n);
-
-function openScore(){document.getElementById("scoreSheet").classList.add("open");renderScore();}
-function closeScore(){document.getElementById("scoreSheet").classList.remove("open");}
+function openScore(){$("scoreSheet").classList.add("open");renderScore();}
+function closeScore(){$("scoreSheet").classList.remove("open");}
+function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML;}
 
 function renderScore(){
-  document.getElementById("scoreTitle").textContent=scoreTab==="hole"?`SCORE — HOLE ${curHole} (PAR ${HOLES[curHole].par})`:"SCORECARD";
-  document.getElementById("tabHole").classList.toggle("on",scoreTab==="hole");
-  document.getElementById("tabCard").classList.toggle("on",scoreTab==="card");
-  const b=document.getElementById("scoreBody"); b.innerHTML="";
+  $("scoreTitle").textContent=scoreTab==="hole"?`SCORE — HOLE ${holeLabel(curHole)} (PAR ${C.holes[curHole].par})`:(scoreTab==="card"?"SCORECARD — "+C.name.toUpperCase():"ROUND HISTORY");
+  $("tabHole").classList.toggle("on",scoreTab==="hole");
+  $("tabCard").classList.toggle("on",scoreTab==="card");
+  $("tabHist").classList.toggle("on",scoreTab==="hist");
+  const b=$("scoreBody"); b.innerHTML="";
   if(scoreTab==="hole"){
     players.forEach((p,i)=>{
-      const s=p.scores[curHole];
-      const st=pStats(p);
+      const s=p.scores[curHole], st=pStats(p);
       const row=document.createElement("div"); row.className="prow";
       row.innerHTML=`<span class="pname"></span><span class="ptot">${st.played? st.tot+" ("+fmtToPar(st.toPar)+")":""}</span>
         <span class="stepper">
@@ -464,67 +603,87 @@ function renderScore(){
     });
     b.insertAdjacentHTML("beforeend",`<div class="scoreactions">
       <button id="addPlayer">+ ADD PLAYER</button>
-      <button id="clearHole">CLEAR HOLE</button>
-      <button id="newRound" class="danger">NEW ROUND</button></div>
-      <div class="topar">Tap + to start at par · tap a name to rename</div>`);
+      <button id="clearHole">CLEAR HOLE</button></div>
+      <div class="scoreactions">
+      <button id="finishRound" style="background:var(--navy);color:var(--paper)">FINISH & SAVE ROUND</button>
+      <button id="newRound" class="danger">DISCARD ROUND</button></div>
+      <div class="topar">Tap + to start at par · tap a name to rename · Finish & Save archives to the Rounds tab</div>`);
     b.querySelectorAll(".stepper button").forEach(btn=>btn.onclick=()=>{
       const p=players[+btn.dataset.i], d=+btn.dataset.d;
       let s=p.scores[curHole];
-      if(!s) s=(d>0?numPar(curHole):null); // first + = par; first − does nothing
+      if(!s) s=(d>0?numPar(curHole):null);
       else {s+=d; if(s<1)s=null;}
       if(s===null) delete p.scores[curHole]; else p.scores[curHole]=Math.min(s,15);
       saveScores(); renderScore();
     });
-    document.getElementById("addPlayer").onclick=()=>{
+    $("addPlayer").onclick=()=>{
       if(players.length>=4){setStatus("Max 4 players.");return;}
       const n=prompt("Player name:"); if(!n)return;
       players.push({name:n.trim().slice(0,14),scores:{}}); saveScores(); renderScore();
     };
-    document.getElementById("clearHole").onclick=()=>{
-      players.forEach(p=>delete p.scores[curHole]); saveScores(); renderScore();
+    $("clearHole").onclick=()=>{players.forEach(p=>delete p.scores[curHole]); saveScores(); renderScore();};
+    $("finishRound").onclick=finishRound;
+    $("newRound").onclick=()=>{
+      if(confirm("Discard all scores for "+C.name+" WITHOUT saving?")){players.forEach(p=>p.scores={});saveScores();renderScore();}
     };
-    document.getElementById("newRound").onclick=()=>{
-      if(confirm("Wipe all scores and start a new round?")){players.forEach(p=>p.scores={});saveScores();renderScore();}
-    };
+  }else if(scoreTab==="hist"){
+    const hist=loadHistory();
+    if(!hist.length){b.innerHTML='<div class="topar">No saved rounds yet. Use FINISH & SAVE ROUND after your round.</div>';return;}
+    let html="";
+    hist.forEach((r,i)=>{
+      const cn=(COURSES[r.c]||{}).name||r.c;
+      html+=`<div class="prow" style="align-items:flex-start"><span style="flex:1">
+        <span class="pname">${cn}</span><br><span class="ptot">${r.d}</span><br>
+        <span style="font-size:12.5px;color:var(--ink)">${r.players.map(p=>`${esc(p.name)} <b>${p.tot}</b> (${fmtToPar(p.toPar)}${p.played<holeNums().length?" thru "+p.played:""})`).join(" · ")}</span>
+        </span><button data-i="${i}" class="delRound" style="background:none;border:none;color:#a1560f;font-size:16px;cursor:pointer;padding:4px">✕</button></div>`;
+    });
+    b.innerHTML=html;
+    b.querySelectorAll(".delRound").forEach(btn=>btn.onclick=()=>{
+      if(!confirm("Delete this saved round?"))return;
+      const h=loadHistory(); h.splice(+btn.dataset.i,1); saveHistory(h); renderScore();
+    });
   }else{
-    let html='<table class="card"><tr><th>Hole</th>';
-    for(let h=1;h<=9;h++)html+=`<th>${h}</th>`; html+="<th>Out</th></tr><tr><td class='hn'>Par</td>";
-    for(let h=1;h<=9;h++)html+=`<td class='hn'>${HOLES[h].par}</td>`; html+="<td class='hn'>35</td></tr>";
-    players.forEach(p=>{const st=pStats(p);html+=`<tr><td class='hn'>${esc(p.name)}</td>`;
-      for(let h=1;h<=9;h++)html+=cell(p,h); html+=`<td class='tot'>${st.out||""}</td></tr>`;});
-    html+='</table><div style="height:10px"></div><table class="card"><tr><th>Hole</th>';
-    for(let h=10;h<=18;h++)html+=`<th>${h}</th>`; html+="<th>In</th><th>Tot</th></tr><tr><td class='hn'>Par</td>";
-    for(let h=10;h<=18;h++)html+=`<td class='hn'>${HOLES[h].par}</td>`; html+="<td class='hn'>36</td><td class='hn'>71</td></tr>";
-    players.forEach(p=>{const st=pStats(p);html+=`<tr><td class='hn'>${esc(p.name)}</td>`;
-      for(let h=10;h<=18;h++)html+=cell(p,h);
-      html+=`<td class='tot'>${st.inn||""}</td><td class='tot'>${st.tot||""}</td></tr>`;});
-    html+="</table>";
+    const hs=holeNums(), half=outCount();
+    const front=hs.slice(0,half), back=hs.slice(half);
+    const parOf=arr=>arr.reduce((a,h)=>a+(C.holes[h].alt?0:numPar(h)),0);
+    const cell=(p,h)=>{const s=p.scores[h];if(!s)return"<td></td>";
+      const d2=s-numPar(h);const c=d2<0?"under":(d2>0?"over":"");return`<td class="${c}">${s}</td>`;};
+    let html=segTable(front,"Out",false);
+    if(back.length) html+='<div style="height:10px"></div>'+segTable(back,"In",true);
     players.forEach(p=>{const st=pStats(p);
       if(st.played)html+=`<div class="topar"><b>${esc(p.name)}</b>: ${st.tot} thru ${st.played} · ${fmtToPar(st.toPar)}</div>`;});
     b.innerHTML=html;
+
+    function segTable(seg,label,withTot){
+      let t='<table class="card"><tr><th>Hole</th>'+seg.map(h=>`<th>${holeLabel(h)}</th>`).join("")+`<th>${label}</th>`+(withTot?"<th>Tot</th>":"")+"</tr>";
+      t+="<tr><td class='hn'>Par</td>"+seg.map(h=>`<td class='hn'>${C.holes[h].par}</td>`).join("")+`<td class='hn'>${parOf(seg)}</td>`+(withTot?`<td class='hn'>${parOf(hs)}</td>`:"")+"</tr>";
+      players.forEach(p=>{
+        const st=pStats(p);
+        const segSum=seg.reduce((a,h)=>a+(p.scores[h]||0),0);
+        t+=`<tr><td class='hn'>${esc(p.name)}</td>`+seg.map(h=>cell(p,h)).join("")+`<td class='tot'>${segSum||""}</td>`+(withTot?`<td class='tot'>${st.tot||""}</td>`:"")+"</tr>";
+      });
+      return t+"</table>";
+    }
   }
-  function cell(p,h){const s=p.scores[h];if(!s)return"<td></td>";
-    const d=s-numPar(h);const c=d<0?"under":(d>0?"over":"");return`<td class="${c}">${s}</td>`;}
-  function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML;}
 }
 function renamePlayer(i){
   const n=prompt("Rename player:",players[i].name);
   if(n)players[i].name=n.trim().slice(0,14); saveScores(); renderScore();
 }
-document.getElementById("btnScore").onclick=openScore;
-document.getElementById("scoreClose").onclick=closeScore;
-document.getElementById("scoreSheet").onclick=e=>{if(e.target.id==="scoreSheet")closeScore();};
-document.getElementById("tabHole").onclick=()=>{scoreTab="hole";renderScore();};
-document.getElementById("tabCard").onclick=()=>{scoreTab="card";renderScore();};
+$("btnScore").onclick=openScore;
+$("scoreClose").onclick=closeScore;
+$("scoreSheet").onclick=e=>{if(e.target.id==="scoreSheet")closeScore();};
+$("tabHole").onclick=()=>{scoreTab="hole";renderScore();};
+$("tabCard").onclick=()=>{scoreTab="card";renderScore();};
+$("tabHist").onclick=()=>{scoreTab="hist";renderScore();};
 
 /* ---------------- init ---------------- */
-(async()=>{
-  await loadGreens();
-  loadScores();
-  renderGreens();
-  selectHole(1);
-  if(Object.keys(greens).length===0)
-    setStatus("First time: tap SETUP, zoom to each green on the satellite map, tap its centre.");
+(()=>{
+  let start=null;
+  try{start=localStorage.getItem("app:course");}catch(e){}
+  if(!start || !COURSES[start]) start=Object.keys(COURSES)[0];
+  loadCourse(start,true);
+  if(Object.keys(COURSES).length>1) setStatus("Tap the course name to switch courses.");
 })();
 </script>
 </body>
