@@ -679,6 +679,16 @@ $("tabHist").onclick=()=>{scoreTab="hist";renderScore();};
 
 /* ---------------- init ---------------- */
 (()=>{
+  // one-time migration: the original single-course app used cw:* keys
+  try{
+    const pairs=[["cw:players","caledonwoods:players"],["cw:greens","caledonwoods:greens"],["cw:tees","caledonwoods:tees"],["cw:tee","caledonwoods:tee"]];
+    pairs.forEach(([oldK,newK])=>{
+      const v=localStorage.getItem(oldK);
+      if(v!==null && localStorage.getItem(newK)===null){
+        localStorage.setItem(newK,v);
+      }
+    });
+  }catch(e){}
   let start=null;
   try{start=localStorage.getItem("app:course");}catch(e){}
   if(!start || !COURSES[start]) start=Object.keys(COURSES)[0];
