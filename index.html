@@ -71,7 +71,8 @@
   #tapline{display:none;justify-content:center;font-size:12px;color:var(--blue);margin-top:3px;font-weight:600}
   #status{font-size:11px;text-align:center;color:#7a6a2c;margin-top:5px;min-height:14px}
   #actions{display:flex;gap:8px;margin-top:8px}
-  #actions button{flex:1;border:none;border-radius:10px;padding:11px 0;font-size:13px;font-weight:700;letter-spacing:.04em;cursor:pointer}
+  #actions button{flex:1;border:none;border-radius:10px;padding:11px 0;font-size:12px;font-weight:700;letter-spacing:.03em;cursor:pointer}
+  #btnDrive{background:var(--green);color:#fff}
   #btnGPS{background:var(--navy);color:var(--paper)}
   #btnGPS.on{background:var(--green)}
   #btnNearest{background:#e6e0d2;color:var(--navy)}
@@ -102,7 +103,7 @@
   #scoreHead b{font-size:15px;letter-spacing:.05em;color:var(--navy)}
   #scoreHead .x{background:none;border:none;font-size:22px;color:var(--navy);cursor:pointer;padding:2px 8px}
   #scoreTabs{display:flex;gap:8px;padding:0 16px 10px}
-  #scoreTabs button{flex:1;border:1px solid var(--navy);background:transparent;color:var(--navy);border-radius:8px;padding:8px 0;font-size:12px;font-weight:700;cursor:pointer}
+  #scoreTabs button{flex:1;border:1px solid var(--navy);background:transparent;color:var(--navy);border-radius:8px;padding:8px 0;font-size:11px;font-weight:700;cursor:pointer}
   #scoreTabs button.on{background:var(--navy);color:var(--paper)}
   #scoreBody{overflow-y:auto;padding:0 16px 16px}
   .prow{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #ded7c6;border-radius:12px;padding:10px 12px;margin-bottom:8px}
@@ -160,6 +161,7 @@
     <div id="actions">
       <button id="btnGPS">START GPS</button>
       <button id="btnScore">SCORE</button>
+      <button id="btnDrive">DRIVE</button>
       <button id="btnNearest">NEAREST HOLE</button>
       <button id="btnClearTap">CLEAR TAP</button>
     </div>
@@ -180,6 +182,7 @@
       <button id="tabHole" class="on">THIS HOLE</button>
       <button id="tabCard">SCORECARD</button>
       <button id="tabHist">ROUNDS</button>
+      <button id="tabDrives">DRIVES</button>
     </div>
     <div id="scoreBody"></div>
   </div>
@@ -336,6 +339,29 @@ function saveMapped(){
 function saveScores(){
   try{localStorage.setItem(courseId+":players",JSON.stringify(players));}catch(e){}
 }
+function loadDrives(){
+  try{const v=localStorage.getItem(courseId+":drives"); if(v) return JSON.parse(v);}catch(e){}
+  return {};
+}
+function saveDrives(d){
+  try{localStorage.setItem(courseId+":drives",JSON.stringify(d));}catch(e){}
+}
+function recordDrive(){
+  if(!myPos){setStatus("Start GPS first, then tap DRIVE from your ball.");return;}
+  const tp=teePts[curHole];
+  if(!tp){setStatus("No tee mapped for this hole — can't measure the drive.");return;}
+  const d=Math.round(distYds([tp.lat,tp.lng],myPos));
+  if(d<30){setStatus("Only "+d+" yds from the tee — walk to your ball, then tap DRIVE.");return;}
+  if(d>450 && !confirm(d+" yds?! Record this monster drive?"))return;
+  const drives=loadDrives();
+  if(!drives[curHole]) drives[curHole]=[];
+  drives[curHole].unshift({d:d,t:new Date().toISOString().slice(0,10)});
+  drives[curHole]=drives[curHole].slice(0,20);
+  saveDrives(drives);
+  const arr=drives[curHole].map(x=>x.d);
+  const avg=Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+  setStatus(`Drive on hole ${holeLabel(curHole)}: ${d} yds ✔  (avg ${avg} · best ${Math.max(...arr)})`);
+}
 function loadHistory(){
   try{const v=localStorage.getItem("app:history"); if(v) return JSON.parse(v);}catch(e){}
   return [];
@@ -348,10 +374,18 @@ function finishRound(){
   if(!active.length){setStatus("No scores to save yet.");return;}
   if(!confirm("Save this round to history and clear the card for a fresh round?"))return;
   const hist=loadHistory();
+  const today=new Date().toISOString().slice(0,10);
+  // bundle today's drives at this course into the round snapshot
+  const drv=loadDrives(); const roundDrives={};
+  for(const h in drv){
+    const todays=drv[h].filter(x=>x.t===today).map(x=>x.d);
+    if(todays.length) roundDrives[h]=todays;
+  }
   hist.unshift({
-    d:new Date().toISOString().slice(0,10),
+    d:today,
     c:courseId,
-    players:active.map(p=>{const st=pStats(p);return{name:p.name,tot:st.tot,toPar:st.toPar,played:st.played,scores:{...p.scores}};})
+    players:active.map(p=>{const st=pStats(p);return{name:p.name,tot:st.tot,toPar:st.toPar,played:st.played,scores:{...p.scores}};}),
+    drives:Object.keys(roundDrives).length?roundDrives:undefined
   });
   saveHistory(hist);
   players.forEach(p=>p.scores={}); saveScores();
@@ -568,6 +602,7 @@ $("btnNearest").onclick=()=>{
   else setStatus("No greens mapped yet.");
 };
 $("btnClearTap").onclick=()=>{tapTarget=null;clearTapUI();};
+$("btnDrive").onclick=recordDrive;
 
 /* ---------------- scoring ---------------- */
 function pStats(p){
@@ -582,10 +617,11 @@ function closeScore(){$("scoreSheet").classList.remove("open");}
 function esc(t){const d=document.createElement("div");d.textContent=t;return d.innerHTML;}
 
 function renderScore(){
-  $("scoreTitle").textContent=scoreTab==="hole"?`SCORE — HOLE ${holeLabel(curHole)} (PAR ${C.holes[curHole].par})`:(scoreTab==="card"?"SCORECARD — "+C.name.toUpperCase():"ROUND HISTORY");
+  $("scoreTitle").textContent=scoreTab==="hole"?`SCORE — HOLE ${holeLabel(curHole)} (PAR ${C.holes[curHole].par})`:(scoreTab==="card"?"SCORECARD — "+C.name.toUpperCase():(scoreTab==="drives"?"DRIVING DISTANCES":"ROUND HISTORY"));
   $("tabHole").classList.toggle("on",scoreTab==="hole");
   $("tabCard").classList.toggle("on",scoreTab==="card");
   $("tabHist").classList.toggle("on",scoreTab==="hist");
+  $("tabDrives").classList.toggle("on",scoreTab==="drives");
   const b=$("scoreBody"); b.innerHTML="";
   if(scoreTab==="hole"){
     players.forEach((p,i)=>{
@@ -626,6 +662,25 @@ function renderScore(){
     $("newRound").onclick=()=>{
       if(confirm("Discard all scores for "+C.name+" WITHOUT saving?")){players.forEach(p=>p.scores={});saveScores();renderScore();}
     };
+  }else if(scoreTab==="drives"){
+    const drives=loadDrives();
+    const hs=holeNums().filter(h=>drives[h]&&drives[h].length);
+    if(!hs.length){b.innerHTML='<div class="topar">No drives recorded at '+C.name+' yet.<br>After your tee shot, walk to your ball and tap the green <b>DRIVE</b> button.</div>';return;}
+    let all=[];
+    let html='<table class="card"><tr><th>Hole</th><th>Last</th><th>Avg</th><th>Best</th><th>#</th></tr>';
+    hs.forEach(h=>{
+      const arr=drives[h].map(x=>x.d); all=all.concat(arr);
+      const avg=Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+      html+=`<tr><td class="hn">${holeLabel(h)}</td><td>${arr[0]}</td><td>${avg}</td><td class="tot">${Math.max(...arr)}</td><td>${arr.length}</td></tr>`;
+    });
+    html+="</table>";
+    const oAvg=Math.round(all.reduce((a,b)=>a+b,0)/all.length);
+    html+=`<div class="topar"><b>${C.name}</b>: ${all.length} drives · avg <b>${oAvg}</b> · best <b>${Math.max(...all)}</b> yds</div>`;
+    html+='<div class="scoreactions"><button id="clearDrives" class="danger">CLEAR ALL DRIVES</button></div>';
+    b.innerHTML=html;
+    $("clearDrives").onclick=()=>{
+      if(confirm("Delete all recorded drives for "+C.name+"?")){saveDrives({});renderScore();}
+    };
   }else if(scoreTab==="hist"){
     const hist=loadHistory();
     if(!hist.length){b.innerHTML='<div class="topar">No saved rounds yet. Use FINISH & SAVE ROUND after your round.</div>';return;}
@@ -635,6 +690,7 @@ function renderScore(){
       html+=`<div class="prow" style="align-items:flex-start"><span style="flex:1">
         <span class="pname">${cn}</span><br><span class="ptot">${r.d}</span><br>
         <span style="font-size:12.5px;color:var(--ink)">${r.players.map(p=>`${esc(p.name)} <b>${p.tot}</b> (${fmtToPar(p.toPar)}${p.played<holeNums().length?" thru "+p.played:""})`).join(" · ")}</span>
+        ${driveLine(r)}
         </span><button data-i="${i}" class="delRound" style="background:none;border:none;color:#a1560f;font-size:16px;cursor:pointer;padding:4px">✕</button></div>`;
     });
     b.innerHTML=html;
@@ -666,6 +722,13 @@ function renderScore(){
     }
   }
 }
+function driveLine(r){
+  if(!r.drives) return "";
+  let all=[]; for(const h in r.drives) all=all.concat(r.drives[h]);
+  if(!all.length) return "";
+  const avg=Math.round(all.reduce((a,b)=>a+b,0)/all.length);
+  return `<br><span style="font-size:11.5px;color:#1e7a45;font-weight:700">🏌️ ${all.length} drives · avg ${avg} · best ${Math.max(...all)} yds</span>`;
+}
 function renamePlayer(i){
   const n=prompt("Rename player:",players[i].name);
   if(n)players[i].name=n.trim().slice(0,14); saveScores(); renderScore();
@@ -676,6 +739,7 @@ $("scoreSheet").onclick=e=>{if(e.target.id==="scoreSheet")closeScore();};
 $("tabHole").onclick=()=>{scoreTab="hole";renderScore();};
 $("tabCard").onclick=()=>{scoreTab="card";renderScore();};
 $("tabHist").onclick=()=>{scoreTab="hist";renderScore();};
+$("tabDrives").onclick=()=>{scoreTab="drives";renderScore();};
 
 /* ---------------- init ---------------- */
 (()=>{
