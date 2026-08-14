@@ -70,9 +70,12 @@
   #sub b{color:var(--ink)}
   #tapline{display:none;justify-content:center;font-size:12px;color:var(--blue);margin-top:3px;font-weight:600}
   #status{font-size:11px;text-align:center;color:#7a6a2c;margin-top:5px;min-height:14px}
-  #actions{display:flex;gap:8px;margin-top:8px}
+  #actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  #actions button{flex:1 1 30%}
   #actions button{flex:1;border:none;border-radius:10px;padding:11px 0;font-size:12px;font-weight:700;letter-spacing:.03em;cursor:pointer}
   #btnDrive{background:var(--green);color:#fff}
+  #btnShot{background:#2b6cb0;color:#fff}
+  #btnShot.armed{background:#7a4bd0}
   #btnGPS{background:var(--navy);color:var(--paper)}
   #btnGPS.on{background:var(--green)}
   #btnNearest{background:#e6e0d2;color:var(--navy)}
@@ -113,6 +116,12 @@
   .stepper button{width:38px;height:38px;border-radius:10px;border:none;background:var(--navy);color:var(--paper);font-size:20px;font-weight:700;cursor:pointer}
   .stepper .val{width:44px;text-align:center;font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
   .stepper .val.na{color:#b3a98f;font-size:16px}
+  .statrow{display:flex;gap:6px;margin-top:8px}
+  .statchip{flex:1;border:1px solid #cfc7b4;background:#f7f4ec;color:#5a6b80;border-radius:8px;padding:7px 0;font-size:11px;font-weight:700;letter-spacing:.03em;cursor:pointer;text-align:center}
+  .statchip.yes{background:#1e7a45;border-color:#1e7a45;color:#fff}
+  .statchip.no{background:#fbe9e7;border-color:#e0b4ad;color:#c0392b}
+  .statchip.pen{background:#fff;color:var(--ink)}
+  .statchip.pen.has{background:#c0392b;border-color:#c0392b;color:#fff}
   .scoreactions{display:flex;gap:8px;margin-top:6px}
   .scoreactions button{flex:1;border:none;border-radius:10px;padding:10px 0;font-size:12px;font-weight:700;cursor:pointer;background:#e6e0d2;color:var(--navy)}
   .scoreactions .danger{color:var(--red)}
@@ -162,6 +171,7 @@
       <button id="btnGPS">START GPS</button>
       <button id="btnScore">SCORE</button>
       <button id="btnDrive">DRIVE</button>
+      <button id="btnShot">SHOT</button>
       <button id="btnNearest">NEAREST HOLE</button>
       <button id="btnClearTap">CLEAR TAP</button>
     </div>
@@ -172,6 +182,16 @@
   <div id="coursePanel">
     <h2>CHOOSE COURSE</h2>
     <div id="courseList"></div>
+  </div>
+</div>
+
+<div id="clubSheet" style="position:fixed;inset:0;background:rgba(14,42,74,.55);display:none;z-index:2200">
+  <div style="background:var(--paper);border-radius:18px 18px 0 0;position:absolute;left:0;right:0;bottom:0;padding:16px 16px calc(20px + env(safe-area-inset-bottom))">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <b style="font-size:13px;letter-spacing:.15em;color:var(--navy)" id="clubTitle">WHICH CLUB?</b>
+      <button id="clubSkip" style="background:none;border:none;color:#5a6b80;font-size:12px;font-weight:700;cursor:pointer">SKIP</button>
+    </div>
+    <div id="clubGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px"></div>
   </div>
 </div>
 
@@ -346,6 +366,59 @@ function loadDrives(){
 function saveDrives(d){
   try{localStorage.setItem(courseId+":drives",JSON.stringify(d));}catch(e){}
 }
+const CLUBS=["Dr","3W","5W","Hy","4i","5i","6i","7i","8i","9i","PW","GW","SW","LW"];
+let clubCb=null, shotStart=null;
+function pickClub(title,cb){
+  clubCb=cb;
+  $("clubTitle").textContent=title;
+  const g=$("clubGrid"); g.innerHTML="";
+  CLUBS.forEach(c=>{
+    const btn=document.createElement("button");
+    btn.textContent=c;
+    btn.style.cssText="border:1px solid #cfc7b4;background:#fff;color:var(--navy);border-radius:10px;padding:12px 0;font-size:14px;font-weight:800;cursor:pointer";
+    btn.onclick=()=>{$("clubSheet").style.display="none";const f=clubCb;clubCb=null;f(c);};
+    g.appendChild(btn);
+  });
+  $("clubSheet").style.display="block";
+}
+$("clubSkip").onclick=()=>{$("clubSheet").style.display="none";const f=clubCb;clubCb=null;if(f)f(null);};
+$("clubSheet").onclick=e=>{if(e.target.id==="clubSheet")$("clubSkip").onclick();};
+
+function loadClubs(){
+  try{const v=localStorage.getItem("app:clubs"); if(v) return JSON.parse(v);}catch(e){}
+  return {};
+}
+function saveClub(club,d){
+  if(!club)return;
+  const cs=loadClubs();
+  if(!cs[club])cs[club]=[];
+  cs[club].unshift({d:d,t:new Date().toISOString().slice(0,10)});
+  cs[club]=cs[club].slice(0,30);
+  try{localStorage.setItem("app:clubs",JSON.stringify(cs));}catch(e){}
+}
+function recordShot(){
+  if(!myPos){setStatus("Start GPS first.");return;}
+  if(!shotStart){
+    shotStart=[...myPos];
+    $("btnShot").textContent="SHOT: END";
+    $("btnShot").classList.add("armed");
+    setStatus("Shot armed at your position — hit, walk to your ball, tap SHOT: END.");
+    return;
+  }
+  const d=Math.round(distYds(shotStart,myPos));
+  shotStart=null;
+  $("btnShot").textContent="SHOT";
+  $("btnShot").classList.remove("armed");
+  if(d<5){setStatus("Only "+d+" yds — shot cancelled.");return;}
+  pickClub("SHOT: "+d+" YDS — WHICH CLUB?",club=>{
+    saveClub(club,d);
+    if(club){
+      const arr=loadClubs()[club].map(x=>x.d);
+      const avg=Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
+      setStatus(`${club}: ${d} yds ✔ (avg ${avg} over ${arr.length})`);
+    }else setStatus(`Shot: ${d} yds (no club tagged)`);
+  });
+}
 function recordDrive(){
   if(!myPos){setStatus("Start GPS first, then tap DRIVE from your ball.");return;}
   const tp=teePts[curHole];
@@ -361,6 +434,7 @@ function recordDrive(){
   const arr=drives[curHole].map(x=>x.d);
   const avg=Math.round(arr.reduce((a,b)=>a+b,0)/arr.length);
   setStatus(`Drive on hole ${holeLabel(curHole)}: ${d} yds ✔  (avg ${avg} · best ${Math.max(...arr)})`);
+  pickClub("DRIVE: "+d+" YDS — WHICH CLUB?",club=>{ if(club)saveClub(club,d); });
 }
 function loadHistory(){
   try{const v=localStorage.getItem("app:history"); if(v) return JSON.parse(v);}catch(e){}
@@ -384,7 +458,7 @@ function finishRound(){
   hist.unshift({
     d:today,
     c:courseId,
-    players:active.map(p=>{const st=pStats(p);return{name:p.name,tot:st.tot,toPar:st.toPar,played:st.played,scores:{...p.scores}};}),
+    players:active.map(p=>{const st=pStats(p);return{name:p.name,tot:st.tot,toPar:st.toPar,played:st.played,scores:{...p.scores},stats:p.stats?JSON.parse(JSON.stringify(p.stats)):undefined,fwH:st.fwH,fwT:st.fwT,girH:st.girH,girT:st.girT,pen:st.pen,putts:st.putts,puttHoles:st.puttHoles};}),
     drives:Object.keys(roundDrives).length?roundDrives:undefined
   });
   saveHistory(hist);
@@ -520,7 +594,15 @@ function updateReadout(){
     sub.innerHTML=`<span>scorecard · <b>${teeLabel()}</b> tees</span><span>GPS line: <b>${d}</b></span>`;
   }else{
     dEl.textContent=d;
-    sub.innerHTML=`<span>to centre of green</span>`;
+    if(g.front||g.back){
+      const parts=[];
+      if(g.front) parts.push(`<span>F <b>${Math.round(distYds(myPos,[g.front.lat,g.front.lng]))}</b></span>`);
+      parts.push(`<span>C <b>${d}</b></span>`);
+      if(g.back) parts.push(`<span>B <b>${Math.round(distYds(myPos,[g.back.lat,g.back.lng]))}</b></span>`);
+      sub.innerHTML=parts.join("");
+    }else{
+      sub.innerHTML=`<span>to centre of green</span>`;
+    }
   }
   dEl.classList.toggle("stale",Date.now()-lastFix>10000);
   if(tapTarget){
@@ -549,9 +631,16 @@ function clearTapUI(){
 map.on("click",e=>{
   if(mode==="setup"){
     const pt={lat:e.latlng.lat,lng:e.latlng.lng};
-    if(setupTarget==="green") greens[curHole]=pt; else teePts[curHole]=pt;
+    if(setupTarget==="green"){
+      const prev=greens[curHole]||{};
+      greens[curHole]={...prev,lat:pt.lat,lng:pt.lng};
+    }else if(setupTarget==="front"||setupTarget==="back"){
+      if(!greens[curHole]){setStatus("Tap the green CENTRE first, then front/back edges.");return;}
+      greens[curHole][setupTarget]=pt;
+    }else teePts[curHole]=pt;
     saveMapped(); renderMarkers(); updateReadout();
-    setStatus(`Hole ${holeLabel(curHole)} ${setupTarget==="green"?"green":"tee box"} saved ✔`);
+    const names={green:"green centre",front:"green FRONT",back:"green BACK",tee:"tee box"};
+    setStatus(`Hole ${holeLabel(curHole)} ${names[setupTarget]} saved ✔`);
   }else{
     tapTarget=[e.latlng.lat,e.latlng.lng];
     if(tapMarker) tapMarker.setLatLng(tapTarget);
@@ -576,9 +665,12 @@ $("modeToggle").onclick=()=>{
 };
 $("setupNext").onclick=()=>{ if(curHole<lastHole()) selectHole(curHole+1); };
 $("setupTarget").onclick=()=>{
-  setupTarget=setupTarget==="green"?"tee":"green";
-  $("setupTarget").textContent="TARGET: "+(setupTarget==="green"?"GREEN":"TEE");
-  $("setupWhat").textContent=setupTarget==="green"?"centre of the green":"middle of the tee boxes";
+  const order=["green","front","back","tee"];
+  setupTarget=order[(order.indexOf(setupTarget)+1)%order.length];
+  const names={green:"CENTRE",front:"FRONT",back:"BACK",tee:"TEE"};
+  const what={green:"centre of the green",front:"FRONT edge of the green",back:"BACK edge of the green",tee:"middle of the tee boxes"};
+  $("setupTarget").textContent="TARGET: "+names[setupTarget];
+  $("setupWhat").textContent=what[setupTarget];
 };
 $("btnExport").onclick=async()=>{
   const nG=Object.keys(greens).length, nT=Object.keys(teePts).length;
@@ -603,13 +695,24 @@ $("btnNearest").onclick=()=>{
 };
 $("btnClearTap").onclick=()=>{tapTarget=null;clearTapUI();};
 $("btnDrive").onclick=recordDrive;
+$("btnShot").onclick=recordShot;
 
 /* ---------------- scoring ---------------- */
 function pStats(p){
   const hs=holeNums(), half=outCount();
   let out=0,inn=0,parAcc=0,played=0;
-  hs.forEach((h,i)=>{const s=p.scores[h];if(s){(i<half?out+=s:inn+=s);parAcc+=numPar(h);played++;}});
-  return{out,inn,tot:out+inn,toPar:(out+inn)-parAcc,played};
+  let fwH=0,fwT=0,girH=0,girT=0,pen=0,putts=0,puttHoles=0;
+  hs.forEach((h,i)=>{
+    const s=p.scores[h];if(s){(i<half?out+=s:inn+=s);parAcc+=numPar(h);played++;}
+    const st=(p.stats||{})[h];
+    if(st){
+      if(st.fw==="y"){fwH++;fwT++;} else if(st.fw==="n"){fwT++;}
+      if(st.gir==="y"){girH++;girT++;} else if(st.gir==="n"){girT++;}
+      pen+=st.pen||0;
+      if(st.putts){putts+=st.putts;puttHoles++;}
+    }
+  });
+  return{out,inn,tot:out+inn,toPar:(out+inn)-parAcc,played,fwH,fwT,girH,girT,pen,putts,puttHoles};
 }
 const fmtToPar=n=>n===0?"E":(n>0?"+"+n:""+n);
 function openScore(){$("scoreSheet").classList.add("open");renderScore();}
@@ -626,16 +729,38 @@ function renderScore(){
   if(scoreTab==="hole"){
     players.forEach((p,i)=>{
       const s=p.scores[curHole], st=pStats(p);
+      if(!p.stats) p.stats={};
+      const hs=p.stats[curHole]||{};
+      const isPar3=numPar(curHole)===3;
       const row=document.createElement("div"); row.className="prow";
+      row.style.flexWrap="wrap";
+      const statHtml=i===0?`
+        <span class="statrow" style="flex-basis:100%">
+          ${isPar3?"":`<button class="statchip ${hs.fw==="y"?"yes":hs.fw==="n"?"no":""}" data-i="${i}" data-k="fw">FWY ${hs.fw==="y"?"✓":hs.fw==="n"?"✗":"–"}</button>`}
+          <button class="statchip ${hs.gir==="y"?"yes":hs.gir==="n"?"no":""}" data-i="${i}" data-k="gir">GIR ${hs.gir==="y"?"✓":hs.gir==="n"?"✗":"–"}</button>
+          <button class="statchip ${hs.putts?"yes":""}" data-i="${i}" data-k="putts">PUTTS ${hs.putts||"–"}</button>
+          <button class="statchip pen ${hs.pen?"has":""}" data-i="${i}" data-k="pen">PEN ${hs.pen||0}</button>
+        </span>`:"";
       row.innerHTML=`<span class="pname"></span><span class="ptot">${st.played? st.tot+" ("+fmtToPar(st.toPar)+")":""}</span>
         <span class="stepper">
           <button data-i="${i}" data-d="-1">−</button>
           <span class="val ${s?"":"na"}">${s||"–"}</span>
           <button data-i="${i}" data-d="1">+</button>
-        </span>`;
+        </span>${statHtml}`;
       row.querySelector(".pname").textContent=p.name;
       row.querySelector(".pname").onclick=()=>renamePlayer(i);
       b.appendChild(row);
+    });
+    b.querySelectorAll(".statchip").forEach(chip=>chip.onclick=()=>{
+      const p=players[+chip.dataset.i], k=chip.dataset.k;
+      if(!p.stats) p.stats={};
+      if(!p.stats[curHole]) p.stats[curHole]={};
+      const h=p.stats[curHole];
+      if(k==="pen"){ h.pen=((h.pen||0)+1)%4; if(!h.pen) delete h.pen; }
+      else if(k==="putts"){ h.putts=((h.putts||0)+1)%5; if(!h.putts) delete h.putts; }
+      else{ h[k]=h[k]==="y"?"n":(h[k]==="n"?undefined:"y"); if(h[k]===undefined) delete h[k]; }
+      if(!Object.keys(h).length) delete p.stats[curHole];
+      saveScores(); renderScore();
     });
     b.insertAdjacentHTML("beforeend",`<div class="scoreactions">
       <button id="addPlayer">+ ADD PLAYER</button>
@@ -665,7 +790,16 @@ function renderScore(){
   }else if(scoreTab==="drives"){
     const drives=loadDrives();
     const hs=holeNums().filter(h=>drives[h]&&drives[h].length);
-    if(!hs.length){b.innerHTML='<div class="topar">No drives recorded at '+C.name+' yet.<br>After your tee shot, walk to your ball and tap the green <b>DRIVE</b> button.</div>';return;}
+    if(!hs.length){
+      let eh='<div class="topar">No drives recorded at '+C.name+' yet.<br>After your tee shot, walk to your ball and tap the green <b>DRIVE</b> button.</div>';
+      const cs0=loadClubs(); const cks0=CLUBS.filter(c=>cs0[c]&&cs0[c].length);
+      if(cks0.length){
+        eh+='<div style="height:10px"></div><table class="card"><tr><th>Club</th><th>Avg</th><th>Best</th><th>#</th></tr>';
+        cks0.forEach(c=>{const arr=cs0[c].map(x=>x.d);
+          eh+=`<tr><td class="hn">${c}</td><td>${Math.round(arr.reduce((a,b)=>a+b,0)/arr.length)}</td><td class="tot">${Math.max(...arr)}</td><td>${arr.length}</td></tr>`;});
+        eh+='</table><div class="topar">Club distances (all courses)</div>';
+      }
+      b.innerHTML=eh;return;}
     let all=[];
     let html='<table class="card"><tr><th>Hole</th><th>Last</th><th>Avg</th><th>Best</th><th>#</th></tr>';
     hs.forEach(h=>{
@@ -676,6 +810,13 @@ function renderScore(){
     html+="</table>";
     const oAvg=Math.round(all.reduce((a,b)=>a+b,0)/all.length);
     html+=`<div class="topar"><b>${C.name}</b>: ${all.length} drives · avg <b>${oAvg}</b> · best <b>${Math.max(...all)}</b> yds</div>`;
+    const cs=loadClubs(); const cks=CLUBS.filter(c=>cs[c]&&cs[c].length);
+    if(cks.length){
+      html+='<div style="height:10px"></div><table class="card"><tr><th>Club</th><th>Avg</th><th>Best</th><th>#</th></tr>';
+      cks.forEach(c=>{const arr=cs[c].map(x=>x.d);
+        html+=`<tr><td class="hn">${c}</td><td>${Math.round(arr.reduce((a,b)=>a+b,0)/arr.length)}</td><td class="tot">${Math.max(...arr)}</td><td>${arr.length}</td></tr>`;});
+      html+='</table><div class="topar">Club distances (all courses)</div>';
+    }
     html+='<div class="scoreactions"><button id="clearDrives" class="danger">CLEAR ALL DRIVES</button></div>';
     b.innerHTML=html;
     $("clearDrives").onclick=()=>{
@@ -687,16 +828,23 @@ function renderScore(){
     let html="";
     hist.forEach((r,i)=>{
       const cn=(COURSES[r.c]||{}).name||r.c;
-      html+=`<div class="prow" style="align-items:flex-start"><span style="flex:1">
-        <span class="pname">${cn}</span><br><span class="ptot">${r.d}</span><br>
-        <span style="font-size:12.5px;color:var(--ink)">${r.players.map(p=>`${esc(p.name)} <b>${p.tot}</b> (${fmtToPar(p.toPar)}${p.played<holeNums().length?" thru "+p.played:""})`).join(" · ")}</span>
+      html+=`<div class="prow histRow" data-i="${i}" style="align-items:flex-start;cursor:pointer"><span style="flex:1">
+        <span class="pname">${cn}</span><br><span class="ptot">${r.d} · tap to view card</span><br>
+        <span style="font-size:12.5px;color:var(--ink)">${r.players.map(p=>`${esc(p.name)} <b>${p.tot}</b> (${fmtToPar(p.toPar)}${p.played<holeNums().length?" thru "+p.played:""})${p.fwT?" · FWY "+p.fwH+"/"+p.fwT:""}${p.girT?" · GIR "+p.girH+"/"+p.girT:""}${p.puttHoles?" · "+p.putts+" putts":""}${p.pen?" · "+p.pen+" pen":""}`).join("<br>")}</span>
         ${driveLine(r)}
-        </span><button data-i="${i}" class="delRound" style="background:none;border:none;color:#a1560f;font-size:16px;cursor:pointer;padding:4px">✕</button></div>`;
+        </span><button data-i="${i}" class="delRound" style="background:none;border:none;color:#a1560f;font-size:16px;cursor:pointer;padding:4px">✕</button></div>
+        <div class="histDetail" data-i="${i}" style="display:none;margin:-2px 0 10px"></div>`;
     });
     b.innerHTML=html;
-    b.querySelectorAll(".delRound").forEach(btn=>btn.onclick=()=>{
+    b.querySelectorAll(".delRound").forEach(btn=>btn.onclick=e=>{
+      e.stopPropagation();
       if(!confirm("Delete this saved round?"))return;
       const h=loadHistory(); h.splice(+btn.dataset.i,1); saveHistory(h); renderScore();
+    });
+    b.querySelectorAll(".histRow").forEach(row=>row.onclick=()=>{
+      const det=b.querySelector('.histDetail[data-i="'+row.dataset.i+'"]');
+      if(det.style.display==="none"){det.innerHTML=roundDetail(hist[+row.dataset.i]);det.style.display="block";}
+      else det.style.display="none";
     });
   }else{
     const hs=holeNums(), half=outCount();
@@ -707,7 +855,16 @@ function renderScore(){
     let html=segTable(front,"Out",false);
     if(back.length) html+='<div style="height:10px"></div>'+segTable(back,"In",true);
     players.forEach(p=>{const st=pStats(p);
-      if(st.played)html+=`<div class="topar"><b>${esc(p.name)}</b>: ${st.tot} thru ${st.played} · ${fmtToPar(st.toPar)}</div>`;});
+      if(st.played){
+        let line=`<div class="topar"><b>${esc(p.name)}</b>: ${st.tot} thru ${st.played} · ${fmtToPar(st.toPar)}`;
+        const bits=[];
+        if(st.fwT)bits.push("FWY "+st.fwH+"/"+st.fwT);
+        if(st.girT)bits.push("GIR "+st.girH+"/"+st.girT);
+        if(st.puttHoles)bits.push(st.putts+" putts ("+st.puttHoles+" holes)");
+        if(st.pen)bits.push(st.pen+" pen");
+        if(bits.length)line+=" · "+bits.join(" · ");
+        html+=line+"</div>";
+      }});
     b.innerHTML=html;
 
     function segTable(seg,label,withTot){
@@ -722,9 +879,62 @@ function renderScore(){
     }
   }
 }
+function drivesForRound(r){
+  if(r.drives) return r.drives;
+  // fallback: match all-time drives by this round's date + course
+  let store={};
+  try{const v=localStorage.getItem(r.c+":drives"); if(v) store=JSON.parse(v);}catch(e){}
+  const out={};
+  for(const h in store){
+    const todays=store[h].filter(x=>x.t===r.d).map(x=>x.d);
+    if(todays.length) out[h]=todays;
+  }
+  return Object.keys(out).length?out:null;
+}
+function roundDetail(r){
+  const rc=COURSES[r.c];
+  if(!rc) return '<div class="topar">Course data not available.</div>';
+  const hs=Object.keys(rc.holes).map(Number).sort((a,b)=>a-b);
+  const oc=rc.outCount||Math.ceil(hs.length/2);
+  const front=hs.slice(0,oc), back=hs.slice(oc);
+  const lbl=h=>rc.holes[h].label||h;
+  const np=h=>parseInt(rc.holes[h].par);
+  const parOf=arr=>arr.reduce((a,h)=>a+(rc.holes[h].alt?0:np(h)),0);
+  const cell=(p,h)=>{const sc=p.scores?p.scores[h]:null;if(!sc)return"<td></td>";
+    const d2=sc-np(h);const c=d2<0?"under":(d2>0?"over":"");return`<td class="${c}">${sc}</td>`;};
+  function seg(segHs,label,withTot){
+    let t='<table class="card"><tr><th>Hole</th>'+segHs.map(h=>`<th>${lbl(h)}</th>`).join("")+`<th>${label}</th>`+(withTot?"<th>Tot</th>":"")+"</tr>";
+    t+="<tr><td class='hn'>Par</td>"+segHs.map(h=>`<td class='hn'>${rc.holes[h].par}</td>`).join("")+`<td class='hn'>${parOf(segHs)}</td>`+(withTot?`<td class='hn'>${parOf(hs)}</td>`:"")+"</tr>";
+    r.players.forEach(p=>{
+      const segSum=segHs.reduce((a,h)=>a+((p.scores&&p.scores[h])||0),0);
+      t+=`<tr><td class='hn'>${esc(p.name)}</td>`+segHs.map(h=>cell(p,h)).join("")+`<td class='tot'>${segSum||""}</td>`+(withTot?`<td class='tot'>${p.tot||""}</td>`:"")+"</tr>";
+      if(p.stats){
+        const anyStat=segHs.some(h=>p.stats[h]);
+        if(anyStat){
+          t+=`<tr><td class='hn' style="font-size:9px">${esc(p.name)} ✓</td>`+segHs.map(h=>{
+            const st=p.stats[h]||{};
+            const marks=[st.fw==="y"?"F":"",st.gir==="y"?"G":"",st.putts?(st.putts+"p"):"",st.pen?("P"+st.pen):""].filter(Boolean).join(" ");
+            return `<td style="font-size:9px;color:#1e7a45;font-weight:700">${marks}</td>`;
+          }).join("")+"<td></td>"+(withTot?"<td></td>":"")+"</tr>";
+        }
+      }
+    });
+    const rd=drivesForRound(r);
+    if(rd){
+      t+="<tr><td class='hn'>Drive</td>"+segHs.map(h=>{
+        const dArr=rd[h];return dArr&&dArr.length?`<td style="color:#1e7a45;font-weight:700">${Math.max(...dArr)}</td>`:"<td></td>";
+      }).join("")+"<td></td>"+(withTot?"<td></td>":"")+"</tr>";
+    }
+    return t+"</table>";
+  }
+  let html=seg(front,"Out",false);
+  if(back.length) html+='<div style="height:8px"></div>'+seg(back,"In",true);
+  return html;
+}
 function driveLine(r){
-  if(!r.drives) return "";
-  let all=[]; for(const h in r.drives) all=all.concat(r.drives[h]);
+  const rd=drivesForRound(r);
+  if(!rd) return "";
+  let all=[]; for(const h in rd) all=all.concat(rd[h]);
   if(!all.length) return "";
   const avg=Math.round(all.reduce((a,b)=>a+b,0)/all.length);
   return `<br><span style="font-size:11.5px;color:#1e7a45;font-weight:700">🏌️ ${all.length} drives · avg ${avg} · best ${Math.max(...all)} yds</span>`;
